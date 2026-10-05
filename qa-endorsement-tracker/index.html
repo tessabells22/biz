@@ -1,0 +1,1496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QA Endorsement Tracker</title>
+<style>
+  /* ============================================================
+     DESIGN TOKENS
+     Layout: utilitarian enterprise dashboard — sticky app bar, tabbed
+     views, summary-before-detail. One accent (QA blue); semantic status
+     hues are a separate channel carried with a label, never color-alone.
+     ============================================================ */
+  :root{
+    color-scheme: light;
+    --plane:#f1f1ee;        /* app background plane */
+    --surface:#fcfcfb;      /* cards */
+    --surface-2:#f6f6f2;    /* subtle fills, table stripes, inputs */
+    --fg:#0b0b0b;
+    --fg-2:#52514e;
+    --muted:#898781;
+    --grid:#e1e0d9;
+    --baseline:#c3c2b7;
+    --border:rgba(11,11,11,0.10);
+    --accent:#2a78d6;
+    --accent-ink:#1c5cab;
+    --accent-fg:#ffffff;
+    --shadow:0 1px 2px rgba(11,11,11,0.06), 0 2px 8px rgba(11,11,11,0.04);
+
+    /* status channel (semantic, not the accent) */
+    --st-nottested:#6b6a65;
+    --st-inprogress:#2a78d6;
+    --st-monitoring:#9a6a00;
+    --st-urgent:#c85a26;
+    --st-blocked:#4a3aa7;
+    --st-failed:#cc3838;
+    --st-passed:#0a7d2c;
+
+    /* categorical palette for QA workload (dataviz default order) */
+    --cat-1:#2a78d6; --cat-2:#eb6834; --cat-3:#1baf7a; --cat-4:#eda100;
+    --cat-5:#e87ba4; --cat-6:#008300; --cat-7:#4a3aa7; --cat-8:#e34948;
+
+    --radius:10px;
+    --radius-sm:7px;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --plane:#0d0d0d;
+      --surface:#1a1a19;
+      --surface-2:#232321;
+      --fg:#ffffff;
+      --fg-2:#c3c2b7;
+      --muted:#8f8e88;
+      --grid:#2c2c2a;
+      --baseline:#383835;
+      --border:rgba(255,255,255,0.10);
+      --accent:#3987e5;
+      --accent-ink:#86b6ef;
+      --accent-fg:#06121f;
+      --shadow:0 1px 2px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.35);
+      --st-nottested:#a0a09a;
+      --st-inprogress:#3987e5;
+      --st-monitoring:#eda100;
+      --st-urgent:#ec835a;
+      --st-blocked:#9085e9;
+      --st-failed:#e06a6a;
+      --st-passed:#2fb24f;
+      --cat-1:#3987e5; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
+      --cat-5:#d55181; --cat-6:#2fb24f; --cat-7:#9085e9; --cat-8:#e66767;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --plane:#0d0d0d;
+    --surface:#1a1a19;
+    --surface-2:#232321;
+    --fg:#ffffff;
+    --fg-2:#c3c2b7;
+    --muted:#8f8e88;
+    --grid:#2c2c2a;
+    --baseline:#383835;
+    --border:rgba(255,255,255,0.10);
+    --accent:#3987e5;
+    --accent-ink:#86b6ef;
+    --accent-fg:#06121f;
+    --shadow:0 1px 2px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.35);
+    --st-nottested:#a0a09a;
+    --st-inprogress:#3987e5;
+    --st-monitoring:#eda100;
+    --st-urgent:#ec835a;
+    --st-blocked:#9085e9;
+    --st-failed:#e06a6a;
+    --st-passed:#2fb24f;
+    --cat-1:#3987e5; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
+    --cat-5:#d55181; --cat-6:#2fb24f; --cat-7:#9085e9; --cat-8:#e66767;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--plane);
+    color:var(--fg);
+    font-family:var(--font);
+    font-size:14px;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  [hidden]{display:none !important}
+  h1,h2,h3{margin:0;text-wrap:balance}
+  button{font-family:inherit;font-size:inherit;cursor:pointer}
+  a{color:var(--accent-ink)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+  /* ---------- App bar ---------- */
+  .appbar{
+    position:sticky;
+    top:env(safe-area-inset-top,0px);
+    z-index:40;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    box-shadow:var(--shadow);
+  }
+  .appbar-inner{
+    max-width:1180px;margin:0 auto;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:12px 20px;
+  }
+  .brand{display:flex;align-items:center;gap:11px;margin-right:auto;min-width:0}
+  .brand .mark{
+    width:34px;height:34px;border-radius:9px;flex:none;
+    background:linear-gradient(145deg,var(--accent),var(--accent-ink));
+    color:var(--accent-fg);display:grid;place-items:center;font-weight:700;font-size:15px;
+    letter-spacing:.02em;
+  }
+  .brand .names{min-width:0}
+  .brand h1{font-size:16px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
+  .brand .sub{font-size:11.5px;color:var(--muted);white-space:nowrap}
+
+  .pill-conn{
+    display:inline-flex;align-items:center;gap:7px;
+    font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;
+    border:1px solid var(--border);background:var(--surface-2);color:var(--fg-2);
+  }
+  .pill-conn .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+  .pill-conn.ok{color:var(--st-passed);border-color:color-mix(in srgb,var(--st-passed) 35%,var(--border))}
+  .pill-conn.ok .dot{background:var(--st-passed)}
+  .pill-conn.demo{color:var(--st-monitoring)}
+  .pill-conn.demo .dot{background:var(--st-monitoring)}
+
+  .iconbtn{
+    display:inline-flex;align-items:center;gap:7px;
+    border:1px solid var(--border);background:var(--surface);color:var(--fg-2);
+    padding:7px 12px;border-radius:8px;font-size:13px;font-weight:550;
+  }
+  .iconbtn:hover{background:var(--surface-2);color:var(--fg)}
+  .iconbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+  .iconbtn.primary:hover{filter:brightness(1.05)}
+  .iconbtn.square{padding:7px 10px}
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    max-width:1180px;margin:0 auto;padding:0 20px;
+    display:flex;gap:4px;flex-wrap:wrap;
+  }
+  .tab{
+    border:0;background:transparent;color:var(--fg-2);
+    padding:11px 14px 12px;font-size:13.5px;font-weight:600;
+    border-bottom:2.5px solid transparent;border-radius:0;
+  }
+  .tab:hover{color:var(--fg)}
+  .tab[aria-selected="true"]{color:var(--accent-ink);border-bottom-color:var(--accent)}
+  .tab-new[aria-selected="true"]{color:var(--accent-ink)}
+
+  /* ---------- Layout ---------- */
+  main{max-width:1180px;margin:0 auto;padding:20px 20px 64px;}
+  .view{display:block}
+  .section-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:4px 2px 14px}
+  .section-head h2{font-size:17px;font-weight:650;letter-spacing:-.01em}
+  .section-head .hint{font-size:12.5px;color:var(--muted)}
+
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+  .card-pad{padding:16px 18px}
+
+  /* ---------- Demo banner ---------- */
+  .banner{
+    max-width:1180px;margin:14px auto 0;padding:0 20px;
+  }
+  .banner-inner{
+    display:flex;gap:12px;align-items:flex-start;
+    background:color-mix(in srgb,var(--st-monitoring) 12%,var(--surface));
+    border:1px solid color-mix(in srgb,var(--st-monitoring) 40%,var(--border));
+    border-radius:var(--radius);padding:12px 14px;
+  }
+  .banner-inner .b-ic{flex:none;font-size:16px;line-height:1.3}
+  .banner-inner .b-txt{font-size:12.8px;color:var(--fg-2);min-width:0}
+  .banner-inner .b-txt b{color:var(--fg)}
+  .banner-inner .b-x{margin-left:auto;flex:none;border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;padding:2px 6px;border-radius:6px}
+  .banner-inner .b-x:hover{background:var(--surface-2);color:var(--fg)}
+
+  /* ---------- Stat tiles ---------- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:12px}
+  .tile{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 14px 13px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+    display:flex;flex-direction:column;gap:3px;text-align:left;width:100%;
+  }
+  .tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tc,var(--muted))}
+  .tile .t-val{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1}
+  .tile .t-lab{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--fg-2);font-weight:600}
+  .tile .t-lab .sdot{width:9px;height:9px;border-radius:50%;background:var(--tc);flex:none}
+  .tile:hover{border-color:color-mix(in srgb,var(--tc) 45%,var(--border))}
+
+  .dash-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px;align-items:start}
+  @media(max-width:860px){.dash-grid{grid-template-columns:1fr}}
+
+  .attn-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:720px){.attn-cols{grid-template-columns:1fr}}
+  .attn{display:flex;flex-direction:column}
+  .attn h3{font-size:12.5px;font-weight:650;letter-spacing:.01em;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .attn h3 .cnt{margin-left:auto;font-size:11px;font-weight:700;color:var(--surface);background:var(--ac,var(--muted));padding:1px 8px;border-radius:999px;min-width:20px;text-align:center}
+  .attn h3 .sdot{width:9px;height:9px;border-radius:50%;background:var(--ac)}
+  .attn ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+  .attn li button{
+    width:100%;text-align:left;border:1px solid var(--border);background:var(--surface-2);
+    border-radius:var(--radius-sm);padding:8px 10px;color:var(--fg);
+    display:flex;flex-direction:column;gap:2px;
+  }
+  .attn li button:hover{border-color:color-mix(in srgb,var(--ac) 45%,var(--border));background:var(--surface)}
+  .attn li .axo-no{font-weight:650;font-variant-numeric:tabular-nums}
+  .attn li .nt{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .attn .empty{font-size:12px;color:var(--muted);padding:10px;border:1px dashed var(--border);border-radius:var(--radius-sm);text-align:center}
+
+  /* ---------- Workload bars ---------- */
+  .wl{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+  .wl-row{display:grid;grid-template-columns:76px 1fr 34px;align-items:center;gap:10px}
+  .wl-name{font-size:12.5px;font-weight:600;color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wl-track{height:14px;background:var(--surface-2);border-radius:4px;position:relative;overflow:hidden}
+  .wl-fill{height:100%;border-radius:4px;background:var(--wc,var(--accent));min-width:4px;transition:width .5s ease}
+  .wl-val{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
+  .wl-axis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px;padding-left:86px}
+
+  /* ---------- Status pill ---------- */
+  .st{
+    display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+    font-size:11.5px;font-weight:650;line-height:1;padding:4px 9px 4px 7px;border-radius:999px;
+    color:var(--sc);background:color-mix(in srgb,var(--sc) 13%,var(--surface));
+    border:1px solid color-mix(in srgb,var(--sc) 34%,transparent);
+  }
+  .st .g{font-size:10px;line-height:1}
+
+  /* ---------- Toolbar (tracker) ---------- */
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .toolbar .grow{flex:1 1 220px;min-width:0}
+  input,select,textarea{
+    font-family:inherit;font-size:13.5px;color:var(--fg);background:var(--surface);
+    border:1px solid var(--border);border-radius:8px;padding:8px 11px;width:100%;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+  textarea{resize:vertical;min-height:38px;line-height:1.4}
+  label.fld{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--fg-2)}
+  .search-wrap{position:relative;flex:1 1 240px;min-width:0}
+  .search-wrap input{padding-left:32px}
+  .search-wrap .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
+
+  /* ---------- Tracker table ---------- */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+  table.axo{width:100%;border-collapse:collapse;min-width:620px}
+  table.axo th{
+    text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
+    font-weight:650;padding:11px 14px;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface);
+    position:sticky;top:0;
+  }
+  table.axo th.sortable{cursor:pointer;user-select:none}
+  table.axo th.sortable:hover{color:var(--fg-2)}
+  table.axo th .arr{opacity:.5;font-size:9px}
+  table.axo td{padding:11px 14px;border-bottom:1px solid var(--grid);vertical-align:middle}
+  table.axo tr.axo-row{cursor:pointer}
+  table.axo tr.axo-row:hover td{background:var(--surface-2)}
+  table.axo tr.axo-row.open td{background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+  .axo-no{font-weight:650;font-variant-numeric:tabular-nums}
+  .axo-no .chev{display:inline-block;width:14px;color:var(--muted);transition:transform .15s}
+  tr.open .axo-no .chev{transform:rotate(90deg);color:var(--accent-ink)}
+  .cell-sub{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  td.touches{font-variant-numeric:tabular-nums;color:var(--fg-2)}
+  tr.hist-row td{padding:0;border-bottom:1px solid var(--grid);background:var(--surface-2)}
+  tr.hist-row .hist-inner{padding:6px 14px 14px 40px}
+
+  /* timeline */
+  .timeline{list-style:none;margin:8px 0 0;padding:0;position:relative}
+  .timeline::before{content:"";position:absolute;left:5px;top:6px;bottom:8px;width:2px;background:var(--grid)}
+  .tl-item{position:relative;padding:0 0 14px 24px}
+  .tl-item:last-child{padding-bottom:0}
+  .tl-item .tl-dot{position:absolute;left:0;top:3px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2.5px solid var(--sc,var(--muted));box-shadow:0 0 0 3px var(--surface-2)}
+  .tl-item.cur .tl-dot{background:var(--sc)}
+  .tl-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-bottom:3px}
+  .tl-meta .dt{font-weight:650;color:var(--fg-2);font-variant-numeric:tabular-nums}
+  .tl-meta .sec{color:var(--muted)}
+  .tl-note{font-size:13px;color:var(--fg);max-width:64ch}
+  .tl-cur-tag{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent-fg);background:var(--accent);padding:1px 6px;border-radius:4px}
+
+  /* ---------- Shift log ---------- */
+  .log-list{display:flex;flex-direction:column;gap:16px}
+  .endo{padding:0;overflow:hidden}
+  .endo-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+  .endo-head .e-title{font-size:14.5px;font-weight:650}
+  .endo-head .e-meta{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .endo-head .chip{font-size:10.5px;font-weight:650;padding:2px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--fg-2)}
+  .endo-head .e-actions{margin-left:auto;display:flex;gap:7px}
+  .endo-head .e-actions button{padding:5px 10px;font-size:12px}
+  .danger{color:var(--st-failed);border-color:color-mix(in srgb,var(--st-failed) 35%,var(--border))}
+  .danger:hover{background:color-mix(in srgb,var(--st-failed) 10%,var(--surface));color:var(--st-failed)}
+  .endo-body{padding:6px 18px 16px}
+  .sec-block{padding:11px 0;border-bottom:1px dashed var(--grid)}
+  .sec-block:last-child{border-bottom:0}
+  .sec-title{font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-2);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .sec-title .n{color:var(--accent-ink);font-variant-numeric:tabular-nums}
+  .sec-lines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+  .sec-lines li{display:flex;gap:10px;align-items:flex-start;font-size:13px}
+  .sec-lines li .lx{color:var(--muted);flex:none;margin-top:1px}
+  .sec-lines li .la{font-weight:650;font-variant-numeric:tabular-nums;flex:none;color:var(--accent-ink)}
+  .sec-lines li .ln{color:var(--fg);min-width:0}
+  .sec-lines li .lst{margin-left:auto;flex:none}
+  .sec-empty{font-size:12px;color:var(--muted);font-style:italic}
+
+  /* ---------- Form ---------- */
+  .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:680px){.form-grid{grid-template-columns:1fr}}
+  .fsec{margin-top:16px}
+  .fsec-head{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .fsec-head h3{font-size:13px;font-weight:650}
+  .fsec-head .n{color:var(--accent-ink);font-weight:700;font-variant-numeric:tabular-nums}
+  .fsec-head .addln{margin-left:auto}
+  .fsec-head .addln button{padding:5px 10px;font-size:12px}
+  .lines{display:flex;flex-direction:column;gap:8px}
+  .line-row{display:grid;grid-template-columns:120px 1fr 170px 34px;gap:8px;align-items:center}
+  .line-row.nonaxo{grid-template-columns:1fr 34px}
+  @media(max-width:680px){
+    .line-row{grid-template-columns:1fr 1fr;}
+    .line-row .note-cell{grid-column:1/3}
+    .line-row.nonaxo{grid-template-columns:1fr 40px}
+  }
+  .rm-line{border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:7px;padding:7px 0;font-size:15px;line-height:1;height:36px}
+  .rm-line:hover{color:var(--st-failed);border-color:color-mix(in srgb,var(--st-failed) 35%,var(--border))}
+  .form-actions{display:flex;gap:10px;align-items:center;margin-top:22px;flex-wrap:wrap}
+  .form-actions .sp{margin-left:auto}
+
+  /* ---------- Empty state ---------- */
+  .empty-state{text-align:center;padding:52px 20px;color:var(--muted)}
+  .empty-state .es-ic{font-size:34px;opacity:.5}
+  .empty-state h3{font-size:16px;color:var(--fg);margin:10px 0 4px}
+  .empty-state p{font-size:13px;max-width:42ch;margin:0 auto 16px}
+
+  /* ---------- Toasts ---------- */
+  .toasts{position:fixed;right:16px;bottom:16px;z-index:90;display:flex;flex-direction:column;gap:8px;max-width:min(360px,90vw)}
+  .toast{
+    background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);
+    border-radius:8px;padding:11px 14px;box-shadow:var(--shadow);font-size:13px;color:var(--fg);
+    display:flex;gap:10px;align-items:flex-start;animation:tin .22s ease;
+  }
+  .toast.err{border-left-color:var(--st-failed)}
+  .toast.ok{border-left-color:var(--st-passed)}
+  @keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+
+  /* ---------- Modal ---------- */
+  .modal-bg{position:fixed;inset:0;z-index:80;background:rgba(11,11,11,0.5);display:grid;place-items:center;padding:20px}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.3);max-width:620px;width:100%;max-height:88vh;overflow:auto}
+  .modal-head{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)}
+  .modal-head h2{font-size:16px;font-weight:650}
+  .modal-head .x{margin-left:auto;border:0;background:transparent;color:var(--muted);font-size:22px;line-height:1;padding:2px 8px;border-radius:6px}
+  .modal-head .x:hover{background:var(--surface-2);color:var(--fg)}
+  .modal-body{padding:18px 20px 22px}
+  .modal-body h3{font-size:13px;margin:16px 0 7px;color:var(--fg)}
+  .modal-body h3:first-child{margin-top:0}
+  .modal-body p{font-size:13px;color:var(--fg-2);margin:0 0 10px;max-width:60ch}
+  .schema{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 4px}
+  .schema th,.schema td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--grid)}
+  .schema th{color:var(--muted);text-transform:uppercase;font-size:10.5px;letter-spacing:.03em}
+  .schema code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:5px}
+  .sample-note{font-size:11.5px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border:1px dashed var(--border);border-radius:999px;background:var(--surface-2)}
+</style>
+</head>
+<body>
+  <header class="appbar">
+    <div class="appbar-inner">
+      <div class="brand">
+        <div class="mark">QA</div>
+        <div class="names">
+          <h1>QA Endorsement Tracker</h1>
+          <div class="sub">Shared shift handover &middot; one AXO, one story</div>
+        </div>
+      </div>
+      <span id="connPill" class="pill-conn"><span class="dot"></span><span id="connText">Connecting…</span></span>
+      <button class="iconbtn" id="copyBtn" title="Copy the latest endorsement in Slack handover format">⧉ Copy latest as Slack</button>
+      <button class="iconbtn square" id="refreshBtn" title="Re-fetch from the backend">⟳ Refresh</button>
+      <button class="iconbtn square" id="themeBtn" title="Toggle light / dark">◐</button>
+      <button class="iconbtn square" id="helpBtn" title="Setup &amp; help">?</button>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" role="tab" data-tab="dashboard" aria-selected="true">Dashboard</button>
+      <button class="tab" role="tab" data-tab="tracker" aria-selected="false">AXO Tracker</button>
+      <button class="tab" role="tab" data-tab="log" aria-selected="false">Shift Log</button>
+      <button class="tab tab-new" role="tab" data-tab="new" aria-selected="false">+ New Endorsement</button>
+    </nav>
+  </header>
+
+  <div class="banner" id="demoBanner" hidden>
+    <div class="banner-inner">
+      <span class="b-ic">◐</span>
+      <div class="b-txt">
+        <b>Demo mode — sample data.</b> No SharePoint site was detected, so the tracker is showing
+        built-in example endorsements saved only in this browser. Changes you make here persist locally
+        and are not shared with the team. To connect the shared list, host <b>index.html</b> on your
+        SharePoint site and follow <b>SETUP.md</b> (or set <code>SP_CONFIG.siteUrl</code> at the top of the file).
+      </div>
+      <button class="b-x" id="bannerX" aria-label="Dismiss">&times;</button>
+    </div>
+  </div>
+
+  <main>
+    <section class="view" id="view-dashboard"></section>
+    <section class="view" id="view-tracker" hidden></section>
+    <section class="view" id="view-log" hidden></section>
+    <section class="view" id="view-new" hidden></section>
+  </main>
+
+  <div class="toasts" id="toasts"></div>
+
+  <div class="modal-bg" id="helpModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modal-head">
+        <h2 id="helpTitle">Setup &amp; help</h2>
+        <button class="x" id="helpX" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>This tracker reads and writes a single SharePoint list so the whole QA team edits one shared
+        copy. Each shift handover is stored as one list item; the six sections are kept as JSON in one
+        text column, so list setup stays trivial.</p>
+        <h3>SharePoint list: <code>QAEndorsements</code></h3>
+        <table class="schema">
+          <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>Title</code></td><td>Single line of text</td><td>Shift label, e.g. "2025-09-30 Night — Juan"</td></tr>
+            <tr><td><code>ShiftDate</code></td><td>Date and Time (or ISO text)</td><td>The shift date</td></tr>
+            <tr><td><code>Shift</code></td><td>Choice / single line</td><td>Day &middot; Mid &middot; Night</td></tr>
+            <tr><td><code>QAResource</code></td><td>Single line of text</td><td>QA who logged it</td></tr>
+            <tr><td><code>Payload</code></td><td>Multiple lines of plain text</td><td><code>JSON.stringify</code> of the six sections</td></tr>
+          </tbody>
+        </table>
+        <h3>Connect it</h3>
+        <p>Upload <code>index.html</code> to a document library (e.g. Site Assets) and surface it via a
+        File Viewer / Embed / Content Editor web part, or link to it as a page. When the page is served
+        from SharePoint it auto-detects the site from the page context. If auto-detect does not apply,
+        set <code>SP_CONFIG.siteUrl</code> near the top of the file. Full steps are in <b>SETUP.md</b>
+        next to this file.</p>
+        <h3>Permissions</h3>
+        <p>List <b>Contribute</b> = can log and edit endorsements. <b>Read</b> = view only.</p>
+        <h3>Demo vs connected</h3>
+        <p>Connected mode reads and writes the live list. Demo mode (no site context) uses sample data
+        saved to this browser so you can preview the tool anywhere; it is clearly labelled and never
+        touches SharePoint.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ============================================================
+   SP_CONFIG — the ONE place to edit for your tenant.
+   Leave siteUrl empty to auto-detect from the SharePoint page
+   context (_spPageContextInfo.webAbsoluteUrl) when hosted on SP.
+   ============================================================ */
+const SP_CONFIG = {
+  siteUrl: '',                 // e.g. 'https://contoso.sharepoint.com/sites/QA'
+  listName: 'QAEndorsements'
+};
+
+/* ============================================================
+   PURE LOGIC (also unit-tested) START
+   No DOM / browser references in this block (ends at the END marker below).
+   ============================================================ */
+const STATUSES = [
+  { key:'Not Tested',        token:'--st-nottested',  glyph:'○' },
+  { key:'In Progress',       token:'--st-inprogress', glyph:'◐' },
+  { key:'Needs Monitoring',  token:'--st-monitoring', glyph:'◉' },
+  { key:'Urgent/High Prio',  token:'--st-urgent',     glyph:'▲' },
+  { key:'Blocked',           token:'--st-blocked',    glyph:'■' },
+  { key:'Failed',            token:'--st-failed',     glyph:'✕' },
+  { key:'Passed',            token:'--st-passed',     glyph:'✓' }
+];
+
+const SECTIONS = [
+  { key:'assigned',   num:1, title:'Assigned During Shift & Status', axo:true },
+  { key:'monitoring', num:2, title:'Needs Monitoring',               axo:true },
+  { key:'blockers',   num:3, title:'Blocker Issues',                 axo:true },
+  { key:'urgent',     num:4, title:'Urgent / High Prio',             axo:true },
+  { key:'notTested',  num:5, title:'Not Yet Tested',                 axo:true },
+  { key:'nonAxo',     num:6, title:'Non-AXO items',                  axo:false }
+];
+
+function shiftRank(shift){
+  return shift === 'Day' ? 0 : shift === 'Mid' ? 1 : shift === 'Night' ? 2 : 3;
+}
+
+/* Aggregate every AXO entry across all endorsements, group by AXO number,
+   sort chronologically (shiftDate, then Day<Mid<Night, then endorsement order,
+   then line order). Current status = most recent entry's status. */
+function deriveAxos(endorsements){
+  const sectionTitleByKey = {};
+  SECTIONS.forEach(s => { if (s.axo) sectionTitleByKey[s.key] = s.title; });
+
+  const map = new Map();
+  let push = 0;
+  const list = endorsements.map((e, i) => ({ e, seq: (typeof e._seq === 'number' ? e._seq : i) }));
+
+  for (const { e, seq } of list){
+    const sections = e.sections || {};
+    for (const secKey of Object.keys(sectionTitleByKey)){
+      const rows = Array.isArray(sections[secKey]) ? sections[secKey] : [];
+      for (const r of rows){
+        if (!r || r.axo === undefined || r.axo === null) continue;
+        const axo = String(r.axo).trim();
+        if (!axo) continue;
+        if (!map.has(axo)) map.set(axo, []);
+        map.get(axo).push({
+          axo,
+          date: e.shiftDate,
+          shift: e.shift,
+          qaResource: e.qaResource || '',
+          section: sectionTitleByKey[secKey],
+          sectionKey: secKey,
+          note: r.note || '',
+          status: r.status || 'Not Tested',
+          _date: e.shiftDate,
+          _shift: shiftRank(e.shift),
+          _seq: seq,
+          _ord: push++
+        });
+      }
+    }
+  }
+
+  const out = [];
+  for (const [axo, steps] of map){
+    steps.sort((a, b) => {
+      if (a._date !== b._date) return a._date < b._date ? -1 : 1;
+      if (a._shift !== b._shift) return a._shift - b._shift;
+      if (a._seq !== b._seq) return a._seq - b._seq;
+      return a._ord - b._ord;
+    });
+    const last = steps[steps.length - 1];
+    out.push({
+      axo,
+      current: last.status,
+      lastDate: last.date,
+      lastShift: last.shift,
+      lastQA: last.qaResource,
+      touches: steps.length,
+      history: steps
+    });
+  }
+  out.sort((a, b) => {
+    if (a.lastDate !== b.lastDate) return a.lastDate < b.lastDate ? 1 : -1;
+    return shiftRank(b.lastShift) - shiftRank(a.lastShift);
+  });
+  return out;
+}
+
+/* Distinct AXOs each QA most-recently touched. */
+function computeWorkload(derived){
+  const counts = {};
+  for (const a of derived){
+    const qa = a.lastQA || 'Unassigned';
+    counts[qa] = (counts[qa] || 0) + 1;
+  }
+  return Object.keys(counts)
+    .map(qa => ({ qa, count: counts[qa] }))
+    .sort((a, b) => b.count - a.count || a.qa.localeCompare(b.qa));
+}
+
+/* Count of AXOs by current status. */
+function statusCounts(derived){
+  const c = {};
+  STATUSES.forEach(s => { c[s.key] = 0; });
+  derived.forEach(a => { c[a.current] = (c[a.current] || 0) + 1; });
+  return c;
+}
+
+/* Sample data for demo mode only — clearly labelled as sample in the UI.
+   8 endorsements, 16 unique AXOs. AXO 15226 has a 5-step journey ending
+   Passed; 15192 and 15175 currently Blocked. */
+const SEED_ENDORSEMENTS = [
+  { id:'seed-e1', _seq:0, shiftDate:'2025-09-30', shift:'Day', qaResource:'Juan',
+    sections:{
+      assigned:[
+        { axo:'15192', note:'Picking up checkout refactor QA', status:'In Progress' },
+        { axo:'15210', note:'Login accessibility fixes verified', status:'Passed' }
+      ],
+      monitoring:[],
+      blockers:[ { axo:'15226', note:'Retest failed — payment webhook still returns 500', status:'Failed' } ],
+      urgent:[],
+      notTested:[ { axo:'15233', note:'New dark-mode settings page, not yet covered', status:'Not Tested' } ],
+      nonAxo:[ { note:'Refreshed the regression suite docs in Confluence' } ]
+    } },
+  { id:'seed-e2', _seq:1, shiftDate:'2025-09-30', shift:'Mid', qaResource:'Priya',
+    sections:{
+      assigned:[ { axo:'15241', note:'Cart promo-code validation', status:'In Progress' } ],
+      monitoring:[ { axo:'15226', note:'Hotfix deployed, watching the 5xx error rate', status:'Needs Monitoring' } ],
+      blockers:[],
+      urgent:[ { axo:'15099', note:'Prod hotfix verification — password reset emails', status:'Urgent/High Prio' } ],
+      notTested:[
+        { axo:'15175', note:'Vendor payout report — awaiting test data', status:'Not Tested' },
+        { axo:'15118', note:'Bulk CSV import screen', status:'Not Tested' }
+      ],
+      nonAxo:[]
+    } },
+  { id:'seed-e3', _seq:2, shiftDate:'2025-09-30', shift:'Night', qaResource:'Marco',
+    sections:{
+      assigned:[ { axo:'15260', note:'Search filters regression green', status:'Passed' } ],
+      monitoring:[
+        { axo:'15226', note:'Error rate back to baseline, re-running regression', status:'In Progress' },
+        { axo:'15305', note:'Intermittent timeout on report export', status:'Needs Monitoring' }
+      ],
+      blockers:[],
+      urgent:[],
+      notTested:[ { axo:'15150', note:'New onboarding checklist flow', status:'Not Tested' } ],
+      nonAxo:[]
+    } },
+  { id:'seed-e7', _seq:3, shiftDate:'2025-09-30', shift:'Night', qaResource:'Aisha',
+    sections:{
+      assigned:[ { axo:'15188', note:'Email template rendering verified across clients', status:'Passed' } ],
+      monitoring:[],
+      blockers:[],
+      urgent:[ { axo:'15201', note:'Checkout 500s under load — needs priority retest', status:'Urgent/High Prio' } ],
+      notTested:[ { axo:'15277', note:'Audit log export feature', status:'Not Tested' } ],
+      nonAxo:[ { note:'Smoke-tested the staging deploy at 02:00, all green' } ]
+    } },
+  { id:'seed-e4', _seq:4, shiftDate:'2025-10-01', shift:'Day', qaResource:'Aisha',
+    sections:{
+      assigned:[ { axo:'15210', note:'Login accessibility — final pass confirmed', status:'Passed' } ],
+      monitoring:[ { axo:'15241', note:'Promo-code edge cases still flaky', status:'Needs Monitoring' } ],
+      blockers:[ { axo:'15175', note:'Blocked: waiting on 3rd-party sandbox credentials from vendor', status:'Blocked' } ],
+      urgent:[],
+      notTested:[ { axo:'15312', note:'New notification preferences panel', status:'Not Tested' } ],
+      nonAxo:[]
+    } },
+  { id:'seed-e8', _seq:5, shiftDate:'2025-10-01', shift:'Day', qaResource:'Marco',
+    sections:{
+      assigned:[ { axo:'15164', note:'Profile avatar upload verified', status:'Passed' } ],
+      monitoring:[ { axo:'15118', note:'CSV import — watching memory use on large files', status:'Needs Monitoring' } ],
+      blockers:[],
+      urgent:[],
+      notTested:[],
+      nonAxo:[]
+    } },
+  { id:'seed-e5', _seq:6, shiftDate:'2025-10-01', shift:'Mid', qaResource:'Juan',
+    sections:{
+      assigned:[ { axo:'15260', note:'Search — additional locale pass green', status:'Passed' } ],
+      monitoring:[ { axo:'15099', note:'Password reset — monitoring bounce rate post-fix', status:'Needs Monitoring' } ],
+      blockers:[ { axo:'15192', note:'Blocked: staging DB migration failing, cannot seed test data', status:'Blocked' } ],
+      urgent:[],
+      notTested:[ { axo:'15226', note:'New build dropped, awaiting a fresh test pass', status:'Not Tested' } ],
+      nonAxo:[]
+    } },
+  { id:'seed-e6', _seq:7, shiftDate:'2025-10-01', shift:'Night', qaResource:'Priya',
+    sections:{
+      assigned:[ { axo:'15226', note:'Full regression green, signed off', status:'Passed' } ],
+      monitoring:[ { axo:'15305', note:'Report export timeout still intermittent overnight', status:'Needs Monitoring' } ],
+      blockers:[],
+      urgent:[ { axo:'15201', note:'Checkout load retest failed — 500s persist at 200 RPS', status:'Failed' } ],
+      notTested:[ { axo:'15150', note:'Onboarding checklist — still queued', status:'Not Tested' } ],
+      nonAxo:[]
+    } }
+];
+/* ============================================================
+   PURE LOGIC END
+   ============================================================ */
+
+/* ============================================================
+   SHAREPOINT REST DATA LAYER
+   Standard SP REST — works on SharePoint Online / modern pages & classic.
+   ============================================================ */
+function resolveSiteUrl(){
+  if (SP_CONFIG.siteUrl) return SP_CONFIG.siteUrl.replace(/\/$/, '');
+  try {
+    if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo && _spPageContextInfo.webAbsoluteUrl){
+      return _spPageContextInfo.webAbsoluteUrl.replace(/\/$/, '');
+    }
+  } catch (e) {}
+  return '';
+}
+
+const SP = {
+  site(){ return resolveSiteUrl(); },
+  list(){ return SP_CONFIG.listName; },
+  itemsBase(){ return `${this.site()}/_api/web/lists/getbytitle('${encodeURIComponent(this.list())}')/items`; },
+
+  async getDigest(){
+    const res = await fetch(`${this.site()}/_api/contextinfo`, {
+      method:'POST',
+      headers:{ 'Accept':'application/json;odata=nometadata' },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('contextinfo ' + res.status);
+    const data = await res.json();
+    return data.FormDigestValue;
+  },
+
+  async getItems(){
+    const url = `${this.itemsBase()}?$select=Id,Title,ShiftDate,Shift,QAResource,Payload&$top=5000&$orderby=ShiftDate desc`;
+    const res = await fetch(url, {
+      method:'GET',
+      headers:{ 'Accept':'application/json;odata=nometadata' },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('getItems ' + res.status);
+    const data = await res.json();
+    return (data.value || []).map(spToModel);
+  },
+
+  async addItem(model){
+    const digest = await this.getDigest();
+    const res = await fetch(this.itemsBase(), {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'Content-Type':'application/json;odata=nometadata',
+        'X-RequestDigest': digest
+      },
+      credentials:'same-origin',
+      body: JSON.stringify(modelToSp(model))
+    });
+    if (!res.ok) throw new Error('addItem ' + res.status);
+    return spToModel(await res.json());
+  },
+
+  async updateItem(model){
+    const digest = await this.getDigest();
+    const res = await fetch(`${this.itemsBase()}(${model.id})`, {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'Content-Type':'application/json;odata=nometadata',
+        'X-RequestDigest': digest,
+        'IF-MATCH':'*',
+        'X-HTTP-Method':'MERGE'
+      },
+      credentials:'same-origin',
+      body: JSON.stringify(modelToSp(model))
+    });
+    if (!res.ok) throw new Error('updateItem ' + res.status);
+    return model;
+  },
+
+  async deleteItem(id){
+    const digest = await this.getDigest();
+    const res = await fetch(`${this.itemsBase()}(${id})`, {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'X-RequestDigest': digest,
+        'IF-MATCH':'*',
+        'X-HTTP-Method':'DELETE'
+      },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('deleteItem ' + res.status);
+    return true;
+  }
+};
+
+function spToModel(item){
+  let sections = {};
+  try { sections = JSON.parse(item.Payload || '{}'); } catch (e) { sections = {}; }
+  SECTIONS.forEach(s => { if (!Array.isArray(sections[s.key])) sections[s.key] = []; });
+  let date = item.ShiftDate || '';
+  if (date && date.length > 10) date = date.slice(0, 10);
+  return {
+    id: item.Id,
+    title: item.Title || '',
+    shiftDate: date,
+    shift: item.Shift || 'Day',
+    qaResource: item.QAResource || '',
+    sections
+  };
+}
+
+function modelToSp(model){
+  return {
+    Title: model.title || buildTitle(model),
+    ShiftDate: model.shiftDate ? model.shiftDate + 'T00:00:00Z' : null,
+    Shift: model.shift,
+    QAResource: model.qaResource,
+    Payload: JSON.stringify(model.sections || {})
+  };
+}
+
+function buildTitle(m){
+  return `${m.shiftDate || ''} ${m.shift || ''} — ${m.qaResource || ''}`.trim();
+}
+
+/* ============================================================
+   STORAGE INTERFACE — dispatches to SharePoint or localStorage.
+   UI code is identical in both modes.
+   ============================================================ */
+const LS_KEY = 'qaEndorsements.v1';
+
+function lsRead(){
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+function lsWrite(list){
+  try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+const store = {
+  mode: 'demo', // 'sharepoint' | 'demo'
+
+  async detect(){
+    const site = resolveSiteUrl();
+    if (site){
+      try {
+        const items = await SP.getItems();
+        this.mode = 'sharepoint';
+        return items;
+      } catch (e) {
+        this.mode = 'demo';
+        toast('Could not reach the SharePoint list — showing demo data. ' + e.message, 'err');
+      }
+    }
+    this.mode = 'demo';
+    let list = lsRead();
+    if (!list){
+      list = SEED_ENDORSEMENTS.map(e => JSON.parse(JSON.stringify(e)));
+      lsWrite(list);
+    }
+    return list;
+  },
+
+  async list(){
+    if (this.mode === 'sharepoint') return SP.getItems();
+    const list = lsRead() || [];
+    return list;
+  },
+
+  async add(model){
+    if (this.mode === 'sharepoint') return SP.addItem(model);
+    const list = lsRead() || [];
+    model.id = 'loc-' + Date.now() + '-' + Math.floor(Math.random() * 1e4);
+    model.title = model.title || buildTitle(model);
+    list.push(model);
+    lsWrite(list);
+    return model;
+  },
+
+  async update(model){
+    if (this.mode === 'sharepoint') return SP.updateItem(model);
+    const list = lsRead() || [];
+    const i = list.findIndex(e => String(e.id) === String(model.id));
+    model.title = model.title || buildTitle(model);
+    if (i >= 0) list[i] = model; else list.push(model);
+    lsWrite(list);
+    return model;
+  },
+
+  async remove(id){
+    if (this.mode === 'sharepoint') return SP.deleteItem(id);
+    const list = (lsRead() || []).filter(e => String(e.id) !== String(id));
+    lsWrite(list);
+    return true;
+  }
+};
+
+/* ============================================================
+   APP STATE + UI
+   ============================================================ */
+const state = {
+  endorsements: [],
+  derived: [],
+  activeTab: 'dashboard',
+  sortKey: 'lastDate',
+  sortDir: 'desc',
+  search: '',
+  statusFilter: 'all',
+  expanded: new Set(),
+  editingId: null
+};
+
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function statusMeta(key){ return STATUSES.find(s => s.key === key) || STATUSES[0]; }
+function statusPill(key){
+  const m = statusMeta(key);
+  return `<span class="st" style="--sc:var(${m.token})"><span class="g">${m.glyph}</span>${esc(m.key)}</span>`;
+}
+function fmtDate(d){
+  if (!d) return '';
+  const parts = d.split('-');
+  if (parts.length !== 3) return d;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(parts[1],10)-1]} ${parseInt(parts[2],10)}`;
+}
+
+function recompute(){ state.derived = deriveAxos(state.endorsements); }
+
+/* ---------- Toasts ---------- */
+function toast(msg, kind){
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.innerHTML = `<span>${esc(msg)}</span>`;
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 320); }, 4200);
+}
+
+/* ---------- Connection pill ---------- */
+function renderConn(){
+  const pill = $('#connPill'), txt = $('#connText');
+  pill.classList.remove('ok','demo');
+  if (store.mode === 'sharepoint'){
+    pill.classList.add('ok');
+    txt.textContent = 'Connected — SharePoint';
+    $('#demoBanner').hidden = true;
+  } else {
+    pill.classList.add('demo');
+    txt.textContent = 'Demo (local)';
+    if (!bannerDismissed) $('#demoBanner').hidden = false;
+  }
+}
+let bannerDismissed = false;
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+function renderDashboard(){
+  const d = state.derived;
+  const counts = statusCounts(d);
+  const total = d.length;
+  const sampleNote = store.mode === 'demo'
+    ? `<span class="sample-note">◐ Sample data — not your team's real figures</span>` : '';
+
+  const tiles = [{key:'__all', label:'Total AXOs', token:'--accent', val:total}]
+    .concat(STATUSES.map(s => ({ key:s.key, label:s.key, token:s.token, val:counts[s.key]||0 })))
+    .map(t => `
+      <button class="tile" style="--tc:var(${t.token})" data-filter="${t.key==='__all'?'all':esc(t.key)}" title="View in AXO Tracker">
+        <span class="t-val">${t.val}</span>
+        <span class="t-lab">${t.key==='__all'?'':'<span class="sdot"></span>'}${esc(t.label)}</span>
+      </button>`).join('');
+
+  const attn = [
+    { label:'Blocked', status:'Blocked', token:'--st-blocked' },
+    { label:'Needs Monitoring', status:'Needs Monitoring', token:'--st-monitoring' },
+    { label:'Not Tested', status:'Not Tested', token:'--st-nottested' }
+  ].map(col => {
+    const items = d.filter(a => a.current === col.status);
+    const body = items.length
+      ? `<ul>${items.map(a => `
+          <li><button data-goto="${esc(a.axo)}">
+            <span class="axo-no">AXO ${esc(a.axo)}</span>
+            <span class="nt">${esc(a.history[a.history.length-1].note) || '—'}</span>
+          </button></li>`).join('')}</ul>`
+      : `<div class="empty">Nothing here — all clear.</div>`;
+    return `<div class="attn" style="--ac:var(${col.token})">
+        <h3><span class="sdot"></span>${esc(col.label)}<span class="cnt">${items.length}</span></h3>
+        ${body}
+      </div>`;
+  }).join('');
+
+  const workload = computeWorkload(d);
+  const maxW = Math.max(1, ...workload.map(w => w.count));
+  const ticks = maxW <= 4 ? maxW : (maxW <= 8 ? Math.ceil(maxW/2)*2 : maxW);
+  const wlRows = workload.map((w, i) => {
+    const cat = '--cat-' + ((i % 8) + 1);
+    return `<div class="wl-row">
+        <span class="wl-name" title="${esc(w.qa)}">${esc(w.qa)}</span>
+        <div class="wl-track"><div class="wl-fill" style="width:${(w.count/ticks*100).toFixed(1)}%;--wc:var(${cat})"></div></div>
+        <span class="wl-val">${w.count}</span>
+      </div>`;
+  }).join('');
+
+  $('#view-dashboard').innerHTML = `
+    <div class="section-head">
+      <h2>Dashboard</h2>
+      <span class="hint">Current status of every AXO across all shift handovers.</span>
+      ${sampleNote}
+    </div>
+    <div class="tiles">${tiles}</div>
+    <div class="dash-grid">
+      <div class="card card-pad">
+        <div class="section-head" style="margin:0 0 12px"><h2 style="font-size:14px">Needs attention now</h2></div>
+        <div class="attn-cols">${attn}</div>
+      </div>
+      <div class="card card-pad">
+        <div class="section-head" style="margin:0 0 14px">
+          <h2 style="font-size:14px">QA workload</h2>
+          <span class="hint">Distinct AXOs each QA most recently touched</span>
+        </div>
+        <div class="wl">${wlRows || '<div class="sec-empty">No data yet.</div>'}</div>
+        ${workload.length ? `<div class="wl-axis"><span>0</span><span>${ticks}</span></div>` : ''}
+      </div>
+    </div>`;
+
+  $$('#view-dashboard .tile').forEach(b => b.addEventListener('click', () => {
+    state.statusFilter = b.dataset.filter;
+    switchTab('tracker');
+  }));
+  $$('#view-dashboard [data-goto]').forEach(b => b.addEventListener('click', () => gotoAxo(b.dataset.goto)));
+}
+
+function gotoAxo(axo){
+  state.search = axo;
+  state.statusFilter = 'all';
+  state.expanded = new Set([axo]);
+  switchTab('tracker');
+  setTimeout(() => {
+    const row = $(`#view-tracker tr.axo-row[data-axo="${CSS.escape(axo)}"]`);
+    if (row) row.scrollIntoView({ behavior:'smooth', block:'center' });
+  }, 60);
+}
+
+/* ============================================================
+   AXO TRACKER
+   ============================================================ */
+function renderTracker(){
+  const statusOptions = ['all'].concat(STATUSES.map(s => s.key))
+    .map(s => `<option value="${esc(s)}"${state.statusFilter===s?' selected':''}>${s==='all'?'All statuses':esc(s)}</option>`).join('');
+
+  let rows = state.derived.slice();
+  const q = state.search.trim().toLowerCase();
+  if (q) rows = rows.filter(a => a.axo.toLowerCase().includes(q)
+      || a.lastQA.toLowerCase().includes(q)
+      || a.history.some(h => (h.note||'').toLowerCase().includes(q)));
+  if (state.statusFilter !== 'all') rows = rows.filter(a => a.current === state.statusFilter);
+
+  const dir = state.sortDir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    let r = 0;
+    if (state.sortKey === 'axo') r = (parseInt(a.axo,10)||0) - (parseInt(b.axo,10)||0);
+    else if (state.sortKey === 'current') r = a.current.localeCompare(b.current);
+    else if (state.sortKey === 'lastQA') r = a.lastQA.localeCompare(b.lastQA);
+    else if (state.sortKey === 'touches') r = a.touches - b.touches;
+    else { // lastDate
+      const ka = a.lastDate + '|' + shiftRank(a.lastShift);
+      const kb = b.lastDate + '|' + shiftRank(b.lastShift);
+      r = ka < kb ? -1 : ka > kb ? 1 : 0;
+    }
+    return r * dir;
+  });
+
+  const arrow = key => state.sortKey === key ? `<span class="arr">${state.sortDir==='asc'?'▲':'▼'}</span>` : '';
+  const head = `<thead><tr>
+      <th class="sortable" data-sort="axo">AXO ${arrow('axo')}</th>
+      <th class="sortable" data-sort="current">Current status ${arrow('current')}</th>
+      <th class="sortable" data-sort="lastDate">Last touched ${arrow('lastDate')}</th>
+      <th class="sortable" data-sort="lastQA">Last QA ${arrow('lastQA')}</th>
+      <th class="sortable" data-sort="touches">Entries ${arrow('touches')}</th>
+    </tr></thead>`;
+
+  const body = rows.map(a => {
+    const open = state.expanded.has(a.axo);
+    const main = `<tr class="axo-row${open?' open':''}" data-axo="${esc(a.axo)}">
+        <td><span class="axo-no"><span class="chev">›</span> ${esc(a.axo)}</span></td>
+        <td>${statusPill(a.current)}</td>
+        <td>${esc(fmtDate(a.lastDate))} <span class="cell-sub">· ${esc(a.lastShift)}</span></td>
+        <td>${esc(a.lastQA)||'—'}</td>
+        <td class="touches">${a.touches}</td>
+      </tr>`;
+    if (!open) return main;
+    const tl = a.history.map((h, i) => {
+      const isCur = i === a.history.length - 1;
+      const m = statusMeta(h.status);
+      return `<li class="tl-item${isCur?' cur':''}" style="--sc:var(${m.token})">
+          <span class="tl-dot"></span>
+          <div class="tl-meta">
+            <span class="dt">${esc(fmtDate(h.date))} · ${esc(h.shift)}</span>
+            <span>·</span><span>${esc(h.qaResource)||'—'}</span>
+            <span>·</span><span class="sec">${esc(h.section)}</span>
+            ${statusPill(h.status)}
+            ${isCur?'<span class="tl-cur-tag">current</span>':''}
+          </div>
+          <div class="tl-note">${esc(h.note)||'<span style="color:var(--muted)">No note</span>'}</div>
+        </li>`;
+    }).join('');
+    return main + `<tr class="hist-row"><td colspan="5"><div class="hist-inner">
+        <ul class="timeline">${tl}</ul></div></td></tr>`;
+  }).join('');
+
+  const table = rows.length
+    ? `<div class="tbl-wrap"><table class="axo">${head}<tbody>${body}</tbody></table></div>`
+    : emptyState('No AXOs match', 'Try clearing the search or status filter.', '🔍');
+
+  $('#view-tracker').innerHTML = `
+    <div class="section-head"><h2>AXO Tracker</h2><span class="hint">One row per AXO — click to see its full cross-shift history.</span></div>
+    <div class="toolbar">
+      <div class="search-wrap"><span class="si">⌕</span>
+        <input id="trackSearch" type="search" placeholder="Search AXO #, QA, or note…" value="${esc(state.search)}" aria-label="Search AXOs">
+      </div>
+      <select id="trackStatus" style="flex:0 0 190px" aria-label="Filter by status">${statusOptions}</select>
+      <span class="hint" style="margin-left:auto">${rows.length} of ${state.derived.length} AXOs</span>
+    </div>
+    ${table}`;
+
+  const si = $('#trackSearch');
+  si.addEventListener('input', () => { state.search = si.value; const pos = si.selectionStart; renderTracker(); const n = $('#trackSearch'); n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} });
+  $('#trackStatus').addEventListener('change', e => { state.statusFilter = e.target.value; renderTracker(); });
+  $$('#view-tracker th.sortable').forEach(th => th.addEventListener('click', () => {
+    const k = th.dataset.sort;
+    if (state.sortKey === k) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+    else { state.sortKey = k; state.sortDir = (k === 'axo' || k === 'lastQA') ? 'asc' : 'desc'; }
+    renderTracker();
+  }));
+  $$('#view-tracker tr.axo-row').forEach(tr => tr.addEventListener('click', () => {
+    const axo = tr.dataset.axo;
+    if (state.expanded.has(axo)) state.expanded.delete(axo); else state.expanded.add(axo);
+    renderTracker();
+  }));
+}
+
+/* ============================================================
+   SHIFT LOG
+   ============================================================ */
+function sortedEndorsements(){
+  return state.endorsements.slice().sort((a, b) => {
+    if (a.shiftDate !== b.shiftDate) return a.shiftDate < b.shiftDate ? 1 : -1;
+    const r = shiftRank(b.shift) - shiftRank(a.shift);
+    if (r !== 0) return r;
+    return String(b.id).localeCompare(String(a.id));
+  });
+}
+
+function renderLog(){
+  const list = sortedEndorsements();
+  if (!list.length){
+    $('#view-log').innerHTML = `<div class="section-head"><h2>Shift Log</h2></div>` +
+      emptyState('No endorsements yet', 'Log the first shift handover to start building AXO history.', '📋',
+        '<button class="iconbtn primary" id="logNew">+ New Endorsement</button>');
+    const b = $('#logNew'); if (b) b.addEventListener('click', () => switchTab('new'));
+    return;
+  }
+
+  const cards = list.map(e => {
+    const secs = SECTIONS.map(s => {
+      const rows = (e.sections && e.sections[s.key]) || [];
+      let inner;
+      if (!rows.length){
+        inner = `<div class="sec-empty">— none —</div>`;
+      } else if (s.axo){
+        inner = `<ul class="sec-lines">${rows.map(r => `
+            <li><span class="lx">•</span><span class="la">${esc(r.axo)}</span>
+              <span class="ln">${esc(r.note)||'—'}</span>
+              <span class="lst">${statusPill(r.status||'Not Tested')}</span></li>`).join('')}</ul>`;
+      } else {
+        inner = `<ul class="sec-lines">${rows.map(r => `
+            <li><span class="lx">•</span><span class="ln">${esc(r.note)||'—'}</span></li>`).join('')}</ul>`;
+      }
+      return `<div class="sec-block">
+          <div class="sec-title"><span class="n">${s.num}.</span>${esc(s.title)}</div>${inner}</div>`;
+    }).join('');
+
+    return `<article class="card endo">
+        <div class="endo-head">
+          <span class="e-title">${esc(fmtDate(e.shiftDate))}, ${esc(e.shiftDate)}</span>
+          <span class="e-meta">
+            <span class="chip">${esc(e.shift)} shift</span>
+            <span class="chip">QA: ${esc(e.qaResource)||'—'}</span>
+          </span>
+          <span class="e-actions">
+            <button class="iconbtn" data-edit="${esc(e.id)}">Edit</button>
+            <button class="iconbtn danger" data-del="${esc(e.id)}">Delete</button>
+          </span>
+        </div>
+        <div class="endo-body">${secs}</div>
+      </article>`;
+  }).join('');
+
+  $('#view-log').innerHTML = `
+    <div class="section-head"><h2>Shift Log</h2><span class="hint">Every handover in the original six-section format, newest first.</span></div>
+    <div class="log-list">${cards}</div>`;
+
+  $$('#view-log [data-edit]').forEach(b => b.addEventListener('click', () => openForm(b.dataset.edit)));
+  $$('#view-log [data-del]').forEach(b => b.addEventListener('click', () => doDelete(b.dataset.del)));
+}
+
+async function doDelete(id){
+  const e = state.endorsements.find(x => String(x.id) === String(id));
+  const label = e ? `${e.shiftDate} ${e.shift} — ${e.qaResource}` : 'this endorsement';
+  if (!confirm(`Delete the endorsement "${label}"?\n\nThis removes it from the backend for the whole team.`)) return;
+  try {
+    await store.remove(id);
+    toast('Endorsement deleted.', 'ok');
+    await reload();
+  } catch (err){
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+/* ============================================================
+   NEW / EDIT ENDORSEMENT FORM
+   ============================================================ */
+function openForm(id){
+  state.editingId = id || null;
+  switchTab('new');
+}
+
+function renderForm(){
+  const editing = state.editingId ? state.endorsements.find(e => String(e.id) === String(state.editingId)) : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const model = editing || { shiftDate: today, shift: 'Day', qaResource: '', sections: {} };
+
+  const statusOpts = sel => STATUSES.map(s => `<option value="${esc(s.key)}"${s.key===sel?' selected':''}>${esc(s.key)}</option>`).join('');
+
+  const axoSections = SECTIONS.filter(s => s.axo).map(s => {
+    const rows = (model.sections && model.sections[s.key]) || [];
+    const linesHtml = (rows.length ? rows : []).map(r => axoLineHtml(s.key, r.axo, r.note, r.status)).join('');
+    return `<div class="fsec" data-section="${s.key}">
+        <div class="fsec-head">
+          <span class="n">${s.num}.</span><h3>${esc(s.title)}</h3>
+          <span class="addln"><button type="button" class="iconbtn" data-add="${s.key}">+ Add line</button></span>
+        </div>
+        <div class="lines" data-lines="${s.key}">${linesHtml}</div>
+      </div>`;
+  }).join('');
+
+  const nonAxoRows = (model.sections && model.sections.nonAxo) || [];
+  const nonAxoHtml = nonAxoRows.map(r => nonAxoLineHtml(r.note)).join('');
+
+  $('#view-new').innerHTML = `
+    <div class="section-head">
+      <h2>${editing ? 'Edit Endorsement' : 'New Endorsement'}</h2>
+      <span class="hint">${editing ? 'Update this shift handover for the whole team.' : 'Log a shift handover in the standard six-section format.'}</span>
+    </div>
+    <form class="card card-pad" id="endoForm" autocomplete="off">
+      <div class="form-grid">
+        <label class="fld">Shift date
+          <input type="date" id="fDate" value="${esc(model.shiftDate)}" required></label>
+        <label class="fld">Shift
+          <select id="fShift">${['Day','Mid','Night'].map(s => `<option${s===model.shift?' selected':''}>${s}</option>`).join('')}</select></label>
+        <label class="fld">QA resource
+          <input type="text" id="fQA" value="${esc(model.qaResource)}" placeholder="e.g. Juan" required></label>
+      </div>
+      ${axoSections}
+      <div class="fsec" data-section="nonAxo">
+        <div class="fsec-head">
+          <span class="n">6.</span><h3>Non-AXO items</h3>
+          <span class="addln"><button type="button" class="iconbtn" data-add="nonAxo">+ Add line</button></span>
+        </div>
+        <div class="lines" data-lines="nonAxo">${nonAxoHtml}</div>
+      </div>
+      <div class="form-actions">
+        ${editing ? '<button type="button" class="iconbtn" id="fCancel">Cancel edit</button>' : ''}
+        <span class="sp"></span>
+        <button type="submit" class="iconbtn primary" id="fSave">${editing ? 'Update endorsement' : 'Save endorsement'}</button>
+      </div>
+    </form>`;
+
+  const statusTemplate = statusOpts;
+
+  $$('#view-new [data-add]').forEach(b => b.addEventListener('click', () => {
+    const key = b.dataset.add;
+    const container = $(`#view-new [data-lines="${key}"]`);
+    const wrap = document.createElement('div');
+    wrap.innerHTML = key === 'nonAxo' ? nonAxoLineHtml('') : axoLineHtml(key, '', '', 'Not Tested');
+    const node = wrap.firstElementChild;
+    container.appendChild(node);
+    bindRemove(node);
+    const first = node.querySelector('input'); if (first) first.focus();
+  }));
+
+  $$('#view-new .line-row').forEach(bindRemove);
+
+  const cancel = $('#fCancel');
+  if (cancel) cancel.addEventListener('click', () => { state.editingId = null; switchTab('log'); });
+
+  $('#endoForm').addEventListener('submit', onSaveForm);
+
+  // populate status selects (built via template string already set their selected)
+  void statusTemplate;
+}
+
+function axoLineHtml(sectionKey, axo, note, status){
+  const opts = STATUSES.map(s => `<option value="${esc(s.key)}"${s.key===(status||'Not Tested')?' selected':''}>${esc(s.key)}</option>`).join('');
+  return `<div class="line-row">
+      <input type="text" inputmode="numeric" class="l-axo" placeholder="AXO #" value="${esc(axo||'')}">
+      <input type="text" class="l-note note-cell" placeholder="What happened / status note" value="${esc(note||'')}">
+      <select class="l-status">${opts}</select>
+      <button type="button" class="rm-line" title="Remove line" aria-label="Remove line">&times;</button>
+    </div>`;
+}
+function nonAxoLineHtml(note){
+  return `<div class="line-row nonaxo">
+      <input type="text" class="l-note" placeholder="Non-AXO note (process, tooling, environment…)" value="${esc(note||'')}">
+      <button type="button" class="rm-line" title="Remove line" aria-label="Remove line">&times;</button>
+    </div>`;
+}
+function bindRemove(node){
+  const btn = node.querySelector('.rm-line');
+  if (btn) btn.addEventListener('click', () => node.remove());
+}
+
+async function onSaveForm(ev){
+  ev.preventDefault();
+  const shiftDate = $('#fDate').value;
+  const shift = $('#fShift').value;
+  const qaResource = $('#fQA').value.trim();
+  if (!shiftDate || !qaResource){ toast('Shift date and QA resource are required.', 'err'); return; }
+
+  const sections = {};
+  SECTIONS.forEach(s => {
+    const container = $(`#view-new [data-lines="${s.key}"]`);
+    const rows = [];
+    container.querySelectorAll('.line-row').forEach(r => {
+      if (s.axo){
+        const axo = r.querySelector('.l-axo').value.trim();
+        const note = r.querySelector('.l-note').value.trim();
+        const status = r.querySelector('.l-status').value;
+        if (axo || note) rows.push({ axo, note, status });
+      } else {
+        const note = r.querySelector('.l-note').value.trim();
+        if (note) rows.push({ note });
+      }
+    });
+    sections[s.key] = rows;
+  });
+
+  const editing = state.editingId ? state.endorsements.find(e => String(e.id) === String(state.editingId)) : null;
+  const model = {
+    id: editing ? editing.id : undefined,
+    shiftDate, shift, qaResource,
+    title: buildTitle({ shiftDate, shift, qaResource }),
+    sections
+  };
+
+  const saveBtn = $('#fSave'); saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+  try {
+    if (editing) { await store.update(model); toast('Endorsement updated.', 'ok'); }
+    else { await store.add(model); toast('Endorsement saved.', 'ok'); }
+    state.editingId = null;
+    await reload();
+    switchTab('log');
+  } catch (err){
+    toast('Save failed: ' + err.message, 'err');
+    saveBtn.disabled = false; saveBtn.textContent = editing ? 'Update endorsement' : 'Save endorsement';
+  }
+}
+
+/* ============================================================
+   COPY LATEST AS SLACK
+   ============================================================ */
+function latestEndorsement(){
+  const list = sortedEndorsements();
+  return list[0] || null;
+}
+function buildSlackText(e){
+  if (!e) return '';
+  const lines = [];
+  lines.push(`*QA Endorsement — ${e.shiftDate} ${e.shift} — ${e.qaResource}*`);
+  lines.push('');
+  SECTIONS.forEach(s => {
+    lines.push(`*${s.num}. ${s.title}*`);
+    const rows = (e.sections && e.sections[s.key]) || [];
+    if (!rows.length){ lines.push('• —'); }
+    else if (s.axo){
+      rows.forEach(r => lines.push(`• AXO ${r.axo} — ${r.note || ''} (${r.status || 'Not Tested'})`));
+    } else {
+      rows.forEach(r => lines.push(`• ${r.note || ''}`));
+    }
+    lines.push('');
+  });
+  return lines.join('\n').trim();
+}
+async function copyLatest(){
+  const e = latestEndorsement();
+  if (!e){ toast('No endorsement to copy yet.', 'err'); return; }
+  const text = buildSlackText(e);
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Latest endorsement copied as Slack handover.', 'ok');
+  } catch (err){
+    // fallback: selectable textarea
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('Copied as Slack handover.', 'ok'); }
+    catch (e2){ toast('Could not copy automatically — select and copy manually.', 'err'); }
+    ta.remove();
+  }
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+function emptyState(title, msg, ic, actionHtml){
+  return `<div class="card"><div class="empty-state">
+      <div class="es-ic">${ic||'∅'}</div>
+      <h3>${esc(title)}</h3><p>${esc(msg)}</p>${actionHtml||''}
+    </div></div>`;
+}
+
+/* ============================================================
+   TABS + WIRING
+   ============================================================ */
+function switchTab(tab){
+  state.activeTab = tab;
+  $$('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === tab)));
+  ['dashboard','tracker','log','new'].forEach(t => { $('#view-' + t).hidden = (t !== tab); });
+  if (tab === 'dashboard') renderDashboard();
+  else if (tab === 'tracker') renderTracker();
+  else if (tab === 'log') renderLog();
+  else if (tab === 'new') renderForm();
+  try { if (location.hash.slice(1) !== tab) history.replaceState(null, '', '#' + tab); } catch (e) {}
+}
+
+function renderAll(){
+  renderConn();
+  renderDashboard();
+  if (state.activeTab !== 'dashboard') switchTab(state.activeTab);
+}
+
+async function reload(){
+  try {
+    state.endorsements = await store.list();
+  } catch (err){
+    toast('Could not load data: ' + err.message, 'err');
+    state.endorsements = [];
+  }
+  recompute();
+  // refresh whichever view is active + dashboard summary
+  if (state.activeTab === 'dashboard') renderDashboard();
+  else if (state.activeTab === 'tracker') renderTracker();
+  else if (state.activeTab === 'log') renderLog();
+  else if (state.activeTab === 'new') { /* leave form as-is */ }
+}
+
+/* theme */
+function applyTheme(t){
+  if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  else document.documentElement.removeAttribute('data-theme');
+  try { localStorage.setItem('qaTheme', t); } catch (e) {}
+}
+function initTheme(){
+  let t = 'system';
+  try { t = localStorage.getItem('qaTheme') || 'system'; } catch (e) {}
+  applyTheme(t);
+}
+function cycleTheme(){
+  let t = 'system';
+  try { t = localStorage.getItem('qaTheme') || 'system'; } catch (e) {}
+  const next = t === 'system' ? 'light' : t === 'light' ? 'dark' : 'system';
+  applyTheme(next);
+  toast('Theme: ' + next, 'ok');
+}
+
+function wire(){
+  $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+  $('#refreshBtn').addEventListener('click', async () => {
+    $('#refreshBtn').disabled = true;
+    const items = await store.detect().catch(() => null);
+    if (items) { state.endorsements = items; recompute(); }
+    else await reload();
+    renderConn();
+    renderAll();
+    $('#refreshBtn').disabled = false;
+    toast('Refreshed from ' + (store.mode === 'sharepoint' ? 'SharePoint.' : 'local demo store.'), 'ok');
+  });
+  $('#copyBtn').addEventListener('click', copyLatest);
+  $('#themeBtn').addEventListener('click', cycleTheme);
+  $('#helpBtn').addEventListener('click', () => { $('#helpModal').hidden = false; });
+  $('#helpX').addEventListener('click', () => { $('#helpModal').hidden = true; });
+  $('#helpModal').addEventListener('click', e => { if (e.target.id === 'helpModal') $('#helpModal').hidden = true; });
+  $('#bannerX').addEventListener('click', () => { bannerDismissed = true; $('#demoBanner').hidden = true; });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#helpModal').hidden = true; });
+}
+
+async function boot(){
+  initTheme();
+  wire();
+  // initial tab from hash
+  const h = (location.hash || '').slice(1);
+  if (['dashboard','tracker','log','new'].includes(h)) state.activeTab = h;
+  state.endorsements = await store.detect();
+  recompute();
+  renderConn();
+  switchTab(state.activeTab);
+}
+
+boot();
+</script>
+</body>
+</html>
