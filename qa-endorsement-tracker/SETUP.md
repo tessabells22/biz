@@ -4,9 +4,10 @@ A single, self-contained `index.html` that reads and writes one shared SharePoin
 list so the whole QA team edits one copy of the shift-endorsement log. No build
 step, no dependencies, no CDNs — it runs offline from any SharePoint page.
 
-Each shift handover is stored as **one list item**. The six handover sections are
-kept as JSON in a single text column, so list setup is trivial and the structure is
-preserved exactly.
+The form mirrors the real Slack **"Endorsement of Tasks"** modal field-for-field
+(see "Field structure" below). Each handover is stored as **one list item**: all of
+its sections *and* its file references are kept as JSON in a single text column, so
+list setup is trivial and the structure is preserved exactly.
 
 ---
 
@@ -21,7 +22,7 @@ Add these columns:
 | `ShiftDate` | Date and Time | The shift date. If you prefer, a **Single line of text** holding an ISO date (`YYYY-MM-DD`) also works. |
 | `Shift` | Choice *(or Single line of text)* | Choices: `Day`, `Mid`, `Night`. |
 | `QAResource` | Single line of text | The QA who logged the shift. |
-| `Payload` | Multiple lines of plain text | `JSON.stringify` of the six sections. Set "Plain text" (not rich text / not append-only). |
+| `Payload` | Multiple lines of plain text | `JSON.stringify({ sections, fileRefs })` — all handover sections **plus** the "Needs Continuation Test File Upload" references. Set "Plain text" (not rich text / not append-only). |
 
 Column **internal names must match** the names above (`ShiftDate`, `Shift`,
 `QAResource`, `Payload`). SharePoint derives the internal name from the name you
@@ -29,9 +30,53 @@ type when the column is first created, so create them with exactly these names. 
 a column already exists with a different internal name, recreate it or adjust the
 `$select`/field names in `index.html`.
 
-> The app never parses individual AXO columns on the server — all six sections live
-> inside `Payload` as JSON. This keeps the list schema stable even if the handover
-> format evolves.
+> The app never parses individual AXO columns on the server — every section and all
+> file references live inside `Payload` as JSON. This keeps the list schema stable
+> even if the handover format evolves. **No extra column is needed for file
+> references** — they ride along in the same `Payload` text.
+
+---
+
+## Field structure — the "Endorsement of Tasks" form
+
+The New/Edit Endorsement form, the Shift Log cards, and the "Copy latest as Slack"
+output all use these labels **verbatim** from the Slack modal, in this order:
+
+1. **Date** *(required to save)*
+2. **QA Resource** *(required to save)* — plus an operational **Shift** selector
+   (Day / Mid / Night) the tool adds for cross-shift ordering.
+3. **Worked On during Shift and Status** — per-AXO lines, default status *In Progress*.
+4. **Needs Monitoring for Develop/Deployment Server - (AXOs that are already in the
+   canvass but hasn't been crossed out)** — default status *Needs Monitoring*.
+5. **Needs Continuation Test File Upload** — file references (see below).
+6. **Blocker Issue that needs Urgency (Include the affected AXO No. if any and the
+   Title raised in Blocker for easy search)** — default status *Blocked*.
+7. **Urgent and High Prio** — default status *Urgent/High Prio*.
+8. **Not Yet Tested** — default status *Not Tested*.
+9. **Non AXO Related but needs Attention - Regression, end-to-end ETC** — free-text
+   lines, no AXO / no status column.
+
+Every field is optional in Slack; the tool only requires **Date** and
+**QA Resource** so each item can be labelled and ordered. Each AXO line carries a
+per-AXO **status** dropdown (the tool's value-add) that defaults sensibly per
+section and is fully overridable (Not Tested / In Progress / Needs Monitoring /
+Urgent-High Prio / Blocked / Failed / Passed).
+
+### File references ("Needs Continuation Test File Upload")
+
+This environment is a static SharePoint-hosted page, so the field captures a **file
+reference** per entry rather than performing a binary upload: a **file name/label**,
+an **optional link** (paste the SharePoint/OneDrive/Drive URL of the file), and an
+optional **note**. Entries support add/remove for multiple files. They are stored in
+`Payload.fileRefs` and shown on the matching Shift Log card and in the Slack copy
+under the same heading.
+
+To attach the actual binary in Connected mode, upload the file to the site's
+document library (or the list item's attachments via
+`.../items(Id)/AttachmentFiles/add(FileName='..')`) and paste its URL into the link
+field. A real in-page binary upload was intentionally left out to keep the page
+dependency-free and the list schema a single text column; add it later against the
+AttachmentFiles REST endpoint if required.
 
 ---
 
@@ -111,3 +156,33 @@ detected mode, so the UI behaves identically in both.
 
 The sample data (demo mode only) is a preview aid. The **source of truth is always
 the SharePoint list.**
+
+---
+
+## 6. Branding & colours (ShipERP palette)
+
+The UI chrome uses a ShipERP-flavoured palette, kept as a **separate channel** from
+the semantic status colours so brand blue never collides with the "In Progress"
+status blue (`#2a78d6`, left untouched). All values are CSS custom properties at the
+top of `index.html` (`:root` and the two dark blocks) — **edit them there** to
+correct the brand.
+
+| Token | Role | Light | Dark |
+|---|---|---|---|
+| `--brand` | primary deep blue — app-bar band, primary buttons, focus | `#0B4F8A` | `#1766A8` |
+| `--brand-deep` | navy depth — app-bar gradient end | `#0A2E52` | `#0C1F38` |
+| `--brand-2` | teal accent — active tab underline, logo, "Total" tile, links | `#0C8A90` | `#39C0C6` |
+| `--brand-2-ink` | teal for link/active-tab text (AA) | `#0A6B70` | `#5FD0D4` |
+| `--accent` | = `--brand` (primary buttons / key tiles) | `#0B4F8A` | `#2F84C9` |
+
+**Source of these values:** the live site (`shiperp.com`) was **not reachable from
+the build environment** (blocked by the network egress proxy), so these are a
+documented **ShipERP-inspired fallback** — a deep professional blue + navy with a
+complementary teal accent. If the real ShipERP brand hex values differ, replace the
+`--brand*` / `--accent*` tokens above in `index.html`; nothing else needs to change.
+
+All brand text/surface pairs were checked for **WCAG AA** (≥ 4.5:1 for normal text)
+in **both** light and dark themes. The semantic status colours (Blocked/violet,
+Failed/red, Passed/green, Needs Monitoring/amber, Urgent/orange, In Progress/blue,
+Not Tested/grey) are a reserved channel, always shown with an icon + label, never
+colour-alone.

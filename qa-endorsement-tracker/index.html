@@ -7,27 +7,46 @@
 <style>
   /* ============================================================
      DESIGN TOKENS
-     Layout: utilitarian enterprise dashboard — sticky app bar, tabbed
-     views, summary-before-detail. One accent (QA blue); semantic status
-     hues are a separate channel carried with a label, never color-alone.
+     Layout: utilitarian enterprise dashboard — brand navy app bar, a
+     surface tab strip below it, tabbed views, summary-before-detail.
+     Two colour channels, kept apart:
+       • BRAND chrome — ShipERP deep blue (#0B4F8A) + navy depth
+         (#0A2E52) + teal accent (#0C8A90). Used for the app bar, primary
+         buttons, active tab, links, focus.
+       • STATUS (semantic) — a separate channel carried with a label, never
+         colour-alone. In Progress stays its own blue (#2a78d6), kept
+         distinct from the ShipERP navy brand so the two never collide.
+     ShipERP hex values: the live site (shiperp.com) was unreachable from
+     this environment, so these are a documented ShipERP-inspired fallback
+     (deep professional blue + navy + teal). Correct them here if the real
+     brand values differ — see SETUP.md.
      ============================================================ */
   :root{
     color-scheme: light;
-    --plane:#f1f1ee;        /* app background plane */
-    --surface:#fcfcfb;      /* cards */
-    --surface-2:#f6f6f2;    /* subtle fills, table stripes, inputs */
-    --fg:#0b0b0b;
-    --fg-2:#52514e;
-    --muted:#898781;
-    --grid:#e1e0d9;
-    --baseline:#c3c2b7;
-    --border:rgba(11,11,11,0.10);
-    --accent:#2a78d6;
-    --accent-ink:#1c5cab;
-    --accent-fg:#ffffff;
-    --shadow:0 1px 2px rgba(11,11,11,0.06), 0 2px 8px rgba(11,11,11,0.04);
+    --plane:#eef1f5;        /* app background plane (cool, brand-biased neutral) */
+    --surface:#ffffff;      /* cards */
+    --surface-2:#f1f5f9;    /* subtle fills, table stripes, inputs */
+    --fg:#0d1b2a;
+    --fg-2:#44566a;
+    --muted:#7a899b;
+    --grid:#e1e8ef;
+    --baseline:#cbd5e0;
+    --border:rgba(13,27,42,0.11);
 
-    /* status channel (semantic, not the accent) */
+    /* ShipERP brand chrome */
+    --brand:#0B4F8A;        /* primary deep blue */
+    --brand-deep:#0A2E52;   /* navy depth for the app-bar gradient */
+    --brand-2:#0C8A90;      /* teal accent — active tab, highlights, logo */
+    --brand-2-ink:#0A6B70;  /* teal for text/links on light (AA) */
+    --brand-fg:#ffffff;     /* text on brand surfaces */
+
+    /* accent == brand primary (primary buttons, focus, key tiles) */
+    --accent:#0B4F8A;
+    --accent-ink:#0A3E6E;
+    --accent-fg:#ffffff;
+    --shadow:0 1px 2px rgba(13,27,42,0.06), 0 2px 8px rgba(13,27,42,0.05);
+
+    /* status channel (semantic, separate from the brand) */
     --st-nottested:#6b6a65;
     --st-inprogress:#2a78d6;
     --st-monitoring:#9a6a00;
@@ -47,17 +66,22 @@
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       color-scheme: dark;
-      --plane:#0d0d0d;
-      --surface:#1a1a19;
-      --surface-2:#232321;
-      --fg:#ffffff;
-      --fg-2:#c3c2b7;
-      --muted:#8f8e88;
-      --grid:#2c2c2a;
-      --baseline:#383835;
-      --border:rgba(255,255,255,0.10);
-      --accent:#3987e5;
-      --accent-ink:#86b6ef;
+      --plane:#0a0f16;
+      --surface:#141b24;
+      --surface-2:#1c2733;
+      --fg:#eef3f8;
+      --fg-2:#aebccb;
+      --muted:#7f8ea0;
+      --grid:#273340;
+      --baseline:#3a4756;
+      --border:rgba(255,255,255,0.11);
+      --brand:#1766a8;
+      --brand-deep:#0c1f38;
+      --brand-2:#39c0c6;
+      --brand-2-ink:#5fd0d4;
+      --brand-fg:#ffffff;
+      --accent:#2f84c9;
+      --accent-ink:#8cc1ec;
       --accent-fg:#06121f;
       --shadow:0 1px 2px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.35);
       --st-nottested:#a0a09a;
@@ -73,17 +97,22 @@
   }
   :root[data-theme="dark"]{
     color-scheme: dark;
-    --plane:#0d0d0d;
-    --surface:#1a1a19;
-    --surface-2:#232321;
-    --fg:#ffffff;
-    --fg-2:#c3c2b7;
-    --muted:#8f8e88;
-    --grid:#2c2c2a;
-    --baseline:#383835;
-    --border:rgba(255,255,255,0.10);
-    --accent:#3987e5;
-    --accent-ink:#86b6ef;
+    --plane:#0a0f16;
+    --surface:#141b24;
+    --surface-2:#1c2733;
+    --fg:#eef3f8;
+    --fg-2:#aebccb;
+    --muted:#7f8ea0;
+    --grid:#273340;
+    --baseline:#3a4756;
+    --border:rgba(255,255,255,0.11);
+    --brand:#1766a8;
+    --brand-deep:#0c1f38;
+    --brand-2:#39c0c6;
+    --brand-2-ink:#5fd0d4;
+    --brand-fg:#ffffff;
+    --accent:#2f84c9;
+    --accent-ink:#8cc1ec;
     --accent-fg:#06121f;
     --shadow:0 1px 2px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.35);
     --st-nottested:#a0a09a;
@@ -113,41 +142,41 @@
   a{color:var(--accent-ink)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 
-  /* ---------- App bar ---------- */
+  /* ---------- App bar (ShipERP brand band) ---------- */
   .appbar{
     position:sticky;
     top:env(safe-area-inset-top,0px);
     z-index:40;
-    background:var(--surface);
-    border-bottom:1px solid var(--border);
     box-shadow:var(--shadow);
   }
   .appbar-inner{
     max-width:1180px;margin:0 auto;
     display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    padding:12px 20px;
+    padding:13px 20px;
+    background:linear-gradient(100deg,var(--brand-deep),var(--brand));
+    color:var(--brand-fg);
   }
   .brand{display:flex;align-items:center;gap:11px;margin-right:auto;min-width:0}
   .brand .mark{
-    width:34px;height:34px;border-radius:9px;flex:none;
-    background:linear-gradient(145deg,var(--accent),var(--accent-ink));
-    color:var(--accent-fg);display:grid;place-items:center;font-weight:700;font-size:15px;
-    letter-spacing:.02em;
+    width:36px;height:36px;border-radius:9px;flex:none;
+    background:#ffffff;
+    color:var(--brand);display:grid;place-items:center;font-weight:800;font-size:15px;
+    letter-spacing:.01em;box-shadow:0 1px 2px rgba(0,0,0,.25);
   }
+  .brand .mark .tk{color:var(--brand-2)}
   .brand .names{min-width:0}
-  .brand h1{font-size:16px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
-  .brand .sub{font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .brand h1{font-size:16px;font-weight:650;letter-spacing:-.01em;white-space:nowrap;color:#fff}
+  .brand .sub{font-size:11.5px;color:rgba(255,255,255,0.72);white-space:nowrap}
 
   .pill-conn{
     display:inline-flex;align-items:center;gap:7px;
     font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;
-    border:1px solid var(--border);background:var(--surface-2);color:var(--fg-2);
+    border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.12);color:#fff;
   }
-  .pill-conn .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
-  .pill-conn.ok{color:var(--st-passed);border-color:color-mix(in srgb,var(--st-passed) 35%,var(--border))}
-  .pill-conn.ok .dot{background:var(--st-passed)}
-  .pill-conn.demo{color:var(--st-monitoring)}
-  .pill-conn.demo .dot{background:var(--st-monitoring)}
+  .pill-conn .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.7);flex:none}
+  .pill-conn.ok{color:#fff;border-color:rgba(255,255,255,0.4)}
+  .pill-conn.ok .dot{background:#5fe0a0}
+  .pill-conn.demo .dot{background:#ffcf5a}
 
   .iconbtn{
     display:inline-flex;align-items:center;gap:7px;
@@ -155,12 +184,23 @@
     padding:7px 12px;border-radius:8px;font-size:13px;font-weight:550;
   }
   .iconbtn:hover{background:var(--surface-2);color:var(--fg)}
-  .iconbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
-  .iconbtn.primary:hover{filter:brightness(1.05)}
+  .iconbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+  .iconbtn.primary:hover{filter:brightness(1.08)}
   .iconbtn.square{padding:7px 10px}
+  /* header-scoped: ghost buttons that read on the navy band */
+  .appbar-inner .iconbtn{
+    background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.22);color:#fff;
+  }
+  .appbar-inner .iconbtn:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .appbar-inner .iconbtn.cta{background:var(--brand-2);border-color:var(--brand-2);color:#fff}
+  .appbar-inner .iconbtn.cta:hover{filter:brightness(1.08)}
 
-  /* ---------- Tabs ---------- */
+  /* ---------- Tabs (surface strip under the band) ---------- */
   .tabs{
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+  }
+  .tabs-inner{
     max-width:1180px;margin:0 auto;padding:0 20px;
     display:flex;gap:4px;flex-wrap:wrap;
   }
@@ -170,8 +210,9 @@
     border-bottom:2.5px solid transparent;border-radius:0;
   }
   .tab:hover{color:var(--fg)}
-  .tab[aria-selected="true"]{color:var(--accent-ink);border-bottom-color:var(--accent)}
-  .tab-new[aria-selected="true"]{color:var(--accent-ink)}
+  .tab[aria-selected="true"]{color:var(--brand-2-ink);border-bottom-color:var(--brand-2)}
+  .tab-new{color:var(--accent-ink)}
+  .tab-new[aria-selected="true"]{color:var(--brand-2-ink)}
 
   /* ---------- Layout ---------- */
   main{max-width:1180px;margin:0 auto;padding:20px 20px 64px;}
@@ -325,29 +366,59 @@
   .sec-lines li .la{font-weight:650;font-variant-numeric:tabular-nums;flex:none;color:var(--accent-ink)}
   .sec-lines li .ln{color:var(--fg);min-width:0}
   .sec-lines li .lst{margin-left:auto;flex:none}
+  .sec-lines li .lfile{flex:none;color:var(--brand-2-ink)}
+  .sec-lines li a{color:var(--brand-2-ink);font-weight:600;text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--brand-2-ink) 40%,transparent)}
+  .sec-lines li a:hover{border-bottom-color:var(--brand-2-ink)}
+  .sec-lines li .lnote{color:var(--muted);font-size:12px}
   .sec-empty{font-size:12px;color:var(--muted);font-style:italic}
 
   /* ---------- Form ---------- */
-  .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-  @media(max-width:680px){.form-grid{grid-template-columns:1fr}}
-  .fsec{margin-top:16px}
-  .fsec-head{display:flex;align-items:center;gap:10px;margin-bottom:9px}
-  .fsec-head h3{font-size:13px;font-weight:650}
-  .fsec-head .n{color:var(--accent-ink);font-weight:700;font-variant-numeric:tabular-nums}
-  .fsec-head .addln{margin-left:auto}
-  .fsec-head .addln button{padding:5px 10px;font-size:12px}
+  .form-head{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+    padding:16px 18px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:var(--radius);margin-bottom:6px;
+  }
+  @media(max-width:680px){.form-head{grid-template-columns:1fr}}
+  .fsec{
+    margin-top:14px;padding:14px 16px;border:1px solid var(--border);
+    border-radius:var(--radius);background:var(--surface);
+  }
+  .fsec::before{content:"";display:block;height:3px;width:34px;border-radius:2px;
+    background:var(--sc,var(--brand-2));margin-bottom:11px}
+  .fsec-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
+  .fsec-head h3{font-size:13.5px;font-weight:650;letter-spacing:-.005em;line-height:1.3}
+  .fsec-head .n{
+    flex:none;display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;
+    font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;
+    color:var(--brand-fg);background:var(--brand);border-radius:6px;
+  }
+  .fsec-head .addln{margin-left:auto;flex:none}
+  .fsec-head .addln button{padding:5px 10px;font-size:12px;white-space:nowrap}
+  .fsec-hint{font-size:11.5px;color:var(--muted);margin:0 0 10px 32px;max-width:72ch;line-height:1.4}
   .lines{display:flex;flex-direction:column;gap:8px}
-  .line-row{display:grid;grid-template-columns:120px 1fr 170px 34px;gap:8px;align-items:center}
+  .line-row{display:grid;grid-template-columns:116px 1fr 168px 34px;gap:8px;align-items:center}
   .line-row.nonaxo{grid-template-columns:1fr 34px}
+  .line-row.file-row{grid-template-columns:150px 1fr 1fr 34px}
   @media(max-width:680px){
     .line-row{grid-template-columns:1fr 1fr;}
     .line-row .note-cell{grid-column:1/3}
     .line-row.nonaxo{grid-template-columns:1fr 40px}
+    .line-row.file-row{grid-template-columns:1fr 40px}
+    .line-row.file-row input{grid-column:1/2}
+    .line-row.file-row .rm-line{grid-row:1;grid-column:2}
   }
+  .lines-empty{font-size:12px;color:var(--muted);font-style:italic;padding:2px 2px 4px}
   .rm-line{border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:7px;padding:7px 0;font-size:15px;line-height:1;height:36px}
   .rm-line:hover{color:var(--st-failed);border-color:color-mix(in srgb,var(--st-failed) 35%,var(--border))}
-  .form-actions{display:flex;gap:10px;align-items:center;margin-top:22px;flex-wrap:wrap}
+  .form-actions{
+    display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;
+    position:sticky;bottom:env(safe-area-inset-bottom,0px);z-index:5;
+    padding:12px 16px;background:color-mix(in srgb,var(--surface) 88%,transparent);
+    backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
   .form-actions .sp{margin-left:auto}
+  .form-actions .hint{font-size:12px;color:var(--muted)}
 
   /* ---------- Empty state ---------- */
   .empty-state{text-align:center;padding:52px 20px;color:var(--muted)}
@@ -392,20 +463,22 @@
         <div class="mark">QA</div>
         <div class="names">
           <h1>QA Endorsement Tracker</h1>
-          <div class="sub">Shared shift handover &middot; one AXO, one story</div>
+          <div class="sub">Endorsement of Tasks &middot; shared shift handover</div>
         </div>
       </div>
       <span id="connPill" class="pill-conn"><span class="dot"></span><span id="connText">Connecting…</span></span>
-      <button class="iconbtn" id="copyBtn" title="Copy the latest endorsement in Slack handover format">⧉ Copy latest as Slack</button>
+      <button class="iconbtn cta" id="copyBtn" title="Copy the latest endorsement in Slack handover format">⧉ Copy latest as Slack</button>
       <button class="iconbtn square" id="refreshBtn" title="Re-fetch from the backend">⟳ Refresh</button>
       <button class="iconbtn square" id="themeBtn" title="Toggle light / dark">◐</button>
       <button class="iconbtn square" id="helpBtn" title="Setup &amp; help">?</button>
     </div>
     <nav class="tabs" role="tablist" aria-label="Views">
-      <button class="tab" role="tab" data-tab="dashboard" aria-selected="true">Dashboard</button>
-      <button class="tab" role="tab" data-tab="tracker" aria-selected="false">AXO Tracker</button>
-      <button class="tab" role="tab" data-tab="log" aria-selected="false">Shift Log</button>
-      <button class="tab tab-new" role="tab" data-tab="new" aria-selected="false">+ New Endorsement</button>
+      <div class="tabs-inner">
+        <button class="tab" role="tab" data-tab="dashboard" aria-selected="true">Dashboard</button>
+        <button class="tab" role="tab" data-tab="tracker" aria-selected="false">AXO Tracker</button>
+        <button class="tab" role="tab" data-tab="log" aria-selected="false">Shift Log</button>
+        <button class="tab tab-new" role="tab" data-tab="new" aria-selected="false">+ New Endorsement</button>
+      </div>
     </nav>
   </header>
 
@@ -439,8 +512,8 @@
       </div>
       <div class="modal-body">
         <p>This tracker reads and writes a single SharePoint list so the whole QA team edits one shared
-        copy. Each shift handover is stored as one list item; the six sections are kept as JSON in one
-        text column, so list setup stays trivial.</p>
+        copy. Each "Endorsement of Tasks" handover is stored as one list item; all of its sections and
+        its file references are kept as JSON in one text column, so list setup stays trivial.</p>
         <h3>SharePoint list: <code>QAEndorsements</code></h3>
         <table class="schema">
           <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
@@ -449,7 +522,7 @@
             <tr><td><code>ShiftDate</code></td><td>Date and Time (or ISO text)</td><td>The shift date</td></tr>
             <tr><td><code>Shift</code></td><td>Choice / single line</td><td>Day &middot; Mid &middot; Night</td></tr>
             <tr><td><code>QAResource</code></td><td>Single line of text</td><td>QA who logged it</td></tr>
-            <tr><td><code>Payload</code></td><td>Multiple lines of plain text</td><td><code>JSON.stringify</code> of the six sections</td></tr>
+            <tr><td><code>Payload</code></td><td>Multiple lines of plain text</td><td><code>JSON.stringify({sections, fileRefs})</code> — all handover sections plus the "Needs Continuation Test File Upload" references (file name, optional link, note)</td></tr>
           </tbody>
         </table>
         <h3>Connect it</h3>
@@ -493,14 +566,67 @@ const STATUSES = [
   { key:'Passed',            token:'--st-passed',     glyph:'✓' }
 ];
 
+/* Section definitions mirror the real Slack "Endorsement of Tasks" modal.
+   `title` is the verbatim Slack field label (used as-is in the Shift Log and the
+   Slack-copy output). `lead` + `hint` split that same label for the guided form:
+   `lead` is the bold heading, `hint` is the parenthetical shown as subtle helper
+   text — together they reproduce the verbatim label. `num` is the field's
+   position in the Slack form (Date = 1, QA Resource = 2, then the sections; the
+   file-upload field is 5, defined separately as FILE_FIELD). `defaultStatus` is
+   the per-AXO status this section seeds (overridable by the user). */
 const SECTIONS = [
-  { key:'assigned',   num:1, title:'Assigned During Shift & Status', axo:true },
-  { key:'monitoring', num:2, title:'Needs Monitoring',               axo:true },
-  { key:'blockers',   num:3, title:'Blocker Issues',                 axo:true },
-  { key:'urgent',     num:4, title:'Urgent / High Prio',             axo:true },
-  { key:'notTested',  num:5, title:'Not Yet Tested',                 axo:true },
-  { key:'nonAxo',     num:6, title:'Non-AXO items',                  axo:false }
+  { key:'workedOn', num:3, axo:true, defaultStatus:'In Progress',
+    title:'Worked On during Shift and Status',
+    lead:'Worked On during Shift and Status', hint:'' },
+  { key:'needsMonitoring', num:4, axo:true, defaultStatus:'Needs Monitoring',
+    title:"Needs Monitoring for Develop/Deployment Server - (AXOs that are already in the canvass but hasn't been crossed out)",
+    lead:'Needs Monitoring for Develop/Deployment Server',
+    hint:"AXOs that are already in the canvass but hasn't been crossed out" },
+  { key:'blocker', num:6, axo:true, defaultStatus:'Blocked',
+    title:'Blocker Issue that needs Urgency (Include the affected AXO No. if any and the Title raised in Blocker for easy search)',
+    lead:'Blocker Issue that needs Urgency',
+    hint:'Include the affected AXO No. if any and the Title raised in Blocker for easy search' },
+  { key:'urgent', num:7, axo:true, defaultStatus:'Urgent/High Prio',
+    title:'Urgent and High Prio',
+    lead:'Urgent and High Prio', hint:'' },
+  { key:'notTested', num:8, axo:true, defaultStatus:'Not Tested',
+    title:'Not Yet Tested',
+    lead:'Not Yet Tested', hint:'' },
+  { key:'nonAxo', num:9, axo:false,
+    title:'Non AXO Related but needs Attention - Regression, end-to-end ETC',
+    lead:'Non AXO Related but needs Attention', hint:'Regression, end-to-end ETC' }
 ];
+
+/* The one non-AXO, non-section field: a per-endorsement list of file references
+   (field 5 in the Slack form). Rendered between "Needs Monitoring" (4) and
+   "Blocker Issue" (6) everywhere. */
+const FILE_FIELD = {
+  num:5,
+  title:'Needs Continuation Test File Upload',
+  lead:'Needs Continuation Test File Upload',
+  hint:'Reference the file(s) the next shift should keep testing — a file name/label, an optional link, and a note.'
+};
+
+/* Ordered render blocks for the Shift Log, form, and Slack copy: sections in
+   Slack order with the file field spliced in at position 5. */
+function orderedBlocks(){
+  const blocks = [];
+  for (const s of SECTIONS){
+    blocks.push({ type:'section', section:s });
+    if (s.key === 'needsMonitoring') blocks.push({ type:'file', field:FILE_FIELD });
+  }
+  return blocks;
+}
+
+function defaultStatusFor(sectionKey){
+  const s = SECTIONS.find(x => x.key === sectionKey);
+  return (s && s.defaultStatus) || 'Not Tested';
+}
+
+/* Normalize an endorsement's file references to [{name,url,note}]. */
+function fileRefsOf(e){
+  return Array.isArray(e && e.fileRefs) ? e.fileRefs : [];
+}
 
 function shiftRank(shift){
   return shift === 'Day' ? 0 : shift === 'Mid' ? 1 : shift === 'Night' ? 2 : 3;
@@ -596,85 +722,99 @@ function statusCounts(derived){
 const SEED_ENDORSEMENTS = [
   { id:'seed-e1', _seq:0, shiftDate:'2025-09-30', shift:'Day', qaResource:'Juan',
     sections:{
-      assigned:[
+      workedOn:[
         { axo:'15192', note:'Picking up checkout refactor QA', status:'In Progress' },
         { axo:'15210', note:'Login accessibility fixes verified', status:'Passed' }
       ],
-      monitoring:[],
-      blockers:[ { axo:'15226', note:'Retest failed — payment webhook still returns 500', status:'Failed' } ],
+      needsMonitoring:[],
+      blocker:[ { axo:'15226', note:'Retest failed — payment webhook still returns 500', status:'Failed' } ],
       urgent:[],
       notTested:[ { axo:'15233', note:'New dark-mode settings page, not yet covered', status:'Not Tested' } ],
       nonAxo:[ { note:'Refreshed the regression suite docs in Confluence' } ]
-    } },
+    },
+    fileRefs:[
+      { name:'15226_payment_webhook_trace.har', url:'https://contoso.sharepoint.com/sites/QA/Shared%20Documents/15226_payment_webhook_trace.har', note:'500 error capture — continue from request #42' }
+    ] },
   { id:'seed-e2', _seq:1, shiftDate:'2025-09-30', shift:'Mid', qaResource:'Priya',
     sections:{
-      assigned:[ { axo:'15241', note:'Cart promo-code validation', status:'In Progress' } ],
-      monitoring:[ { axo:'15226', note:'Hotfix deployed, watching the 5xx error rate', status:'Needs Monitoring' } ],
-      blockers:[],
+      workedOn:[ { axo:'15241', note:'Cart promo-code validation', status:'In Progress' } ],
+      needsMonitoring:[ { axo:'15226', note:'Hotfix deployed, watching the 5xx error rate', status:'Needs Monitoring' } ],
+      blocker:[],
       urgent:[ { axo:'15099', note:'Prod hotfix verification — password reset emails', status:'Urgent/High Prio' } ],
       notTested:[
         { axo:'15175', note:'Vendor payout report — awaiting test data', status:'Not Tested' },
         { axo:'15118', note:'Bulk CSV import screen', status:'Not Tested' }
       ],
       nonAxo:[]
-    } },
+    },
+    fileRefs:[] },
   { id:'seed-e3', _seq:2, shiftDate:'2025-09-30', shift:'Night', qaResource:'Marco',
     sections:{
-      assigned:[ { axo:'15260', note:'Search filters regression green', status:'Passed' } ],
-      monitoring:[
+      workedOn:[ { axo:'15260', note:'Search filters regression green', status:'Passed' } ],
+      needsMonitoring:[
         { axo:'15226', note:'Error rate back to baseline, re-running regression', status:'In Progress' },
         { axo:'15305', note:'Intermittent timeout on report export', status:'Needs Monitoring' }
       ],
-      blockers:[],
+      blocker:[],
       urgent:[],
       notTested:[ { axo:'15150', note:'New onboarding checklist flow', status:'Not Tested' } ],
       nonAxo:[]
-    } },
+    },
+    fileRefs:[] },
   { id:'seed-e7', _seq:3, shiftDate:'2025-09-30', shift:'Night', qaResource:'Aisha',
     sections:{
-      assigned:[ { axo:'15188', note:'Email template rendering verified across clients', status:'Passed' } ],
-      monitoring:[],
-      blockers:[],
+      workedOn:[ { axo:'15188', note:'Email template rendering verified across clients', status:'Passed' } ],
+      needsMonitoring:[],
+      blocker:[],
       urgent:[ { axo:'15201', note:'Checkout 500s under load — needs priority retest', status:'Urgent/High Prio' } ],
       notTested:[ { axo:'15277', note:'Audit log export feature', status:'Not Tested' } ],
       nonAxo:[ { note:'Smoke-tested the staging deploy at 02:00, all green' } ]
-    } },
+    },
+    fileRefs:[] },
   { id:'seed-e4', _seq:4, shiftDate:'2025-10-01', shift:'Day', qaResource:'Aisha',
     sections:{
-      assigned:[ { axo:'15210', note:'Login accessibility — final pass confirmed', status:'Passed' } ],
-      monitoring:[ { axo:'15241', note:'Promo-code edge cases still flaky', status:'Needs Monitoring' } ],
-      blockers:[ { axo:'15175', note:'Blocked: waiting on 3rd-party sandbox credentials from vendor', status:'Blocked' } ],
+      workedOn:[ { axo:'15210', note:'Login accessibility — final pass confirmed', status:'Passed' } ],
+      needsMonitoring:[ { axo:'15241', note:'Promo-code edge cases still flaky', status:'Needs Monitoring' } ],
+      blocker:[ { axo:'15175', note:'Blocked: waiting on 3rd-party sandbox credentials from vendor', status:'Blocked' } ],
       urgent:[],
       notTested:[ { axo:'15312', note:'New notification preferences panel', status:'Not Tested' } ],
       nonAxo:[]
-    } },
+    },
+    fileRefs:[
+      { name:'promo_code_edge_cases.xlsx', url:'', note:'Flaky scenarios checklist — rows 8-14 still open' }
+    ] },
   { id:'seed-e8', _seq:5, shiftDate:'2025-10-01', shift:'Day', qaResource:'Marco',
     sections:{
-      assigned:[ { axo:'15164', note:'Profile avatar upload verified', status:'Passed' } ],
-      monitoring:[ { axo:'15118', note:'CSV import — watching memory use on large files', status:'Needs Monitoring' } ],
-      blockers:[],
+      workedOn:[ { axo:'15164', note:'Profile avatar upload verified', status:'Passed' } ],
+      needsMonitoring:[ { axo:'15118', note:'CSV import — watching memory use on large files', status:'Needs Monitoring' } ],
+      blocker:[],
       urgent:[],
       notTested:[],
       nonAxo:[]
-    } },
+    },
+    fileRefs:[] },
   { id:'seed-e5', _seq:6, shiftDate:'2025-10-01', shift:'Mid', qaResource:'Juan',
     sections:{
-      assigned:[ { axo:'15260', note:'Search — additional locale pass green', status:'Passed' } ],
-      monitoring:[ { axo:'15099', note:'Password reset — monitoring bounce rate post-fix', status:'Needs Monitoring' } ],
-      blockers:[ { axo:'15192', note:'Blocked: staging DB migration failing, cannot seed test data', status:'Blocked' } ],
+      workedOn:[ { axo:'15260', note:'Search — additional locale pass green', status:'Passed' } ],
+      needsMonitoring:[ { axo:'15099', note:'Password reset — monitoring bounce rate post-fix', status:'Needs Monitoring' } ],
+      blocker:[ { axo:'15192', note:'Blocked: staging DB migration failing, cannot seed test data', status:'Blocked' } ],
       urgent:[],
       notTested:[ { axo:'15226', note:'New build dropped, awaiting a fresh test pass', status:'Not Tested' } ],
       nonAxo:[]
-    } },
+    },
+    fileRefs:[] },
   { id:'seed-e6', _seq:7, shiftDate:'2025-10-01', shift:'Night', qaResource:'Priya',
     sections:{
-      assigned:[ { axo:'15226', note:'Full regression green, signed off', status:'Passed' } ],
-      monitoring:[ { axo:'15305', note:'Report export timeout still intermittent overnight', status:'Needs Monitoring' } ],
-      blockers:[],
+      workedOn:[ { axo:'15226', note:'Full regression green, signed off', status:'Passed' } ],
+      needsMonitoring:[ { axo:'15305', note:'Report export timeout still intermittent overnight', status:'Needs Monitoring' } ],
+      blocker:[],
       urgent:[ { axo:'15201', note:'Checkout load retest failed — 500s persist at 200 RPS', status:'Failed' } ],
       notTested:[ { axo:'15150', note:'Onboarding checklist — still queued', status:'Not Tested' } ],
       nonAxo:[]
-    } }
+    },
+    fileRefs:[
+      { name:'15201_load_test_results.pdf', url:'https://contoso.sharepoint.com/sites/QA/Shared%20Documents/15201_load_test_results.pdf', note:'200 RPS run — 500s start at ~3 min, hand to day shift' }
+    ] }
 ];
 /* ============================================================
    PURE LOGIC END
@@ -773,9 +913,15 @@ const SP = {
   }
 };
 
+/* Payload JSON holds BOTH the sections and the file references:
+     { "sections": { … }, "fileRefs": [ {name,url,note}, … ] }
+   Legacy items that stored sections at the top level (no "sections" key) are
+   still read correctly, with an empty fileRefs list. */
 function spToModel(item){
-  let sections = {};
-  try { sections = JSON.parse(item.Payload || '{}'); } catch (e) { sections = {}; }
+  let parsed = {};
+  try { parsed = JSON.parse(item.Payload || '{}'); } catch (e) { parsed = {}; }
+  const sections = (parsed && typeof parsed.sections === 'object' && parsed.sections) ? parsed.sections : parsed;
+  const fileRefs = Array.isArray(parsed && parsed.fileRefs) ? parsed.fileRefs : [];
   SECTIONS.forEach(s => { if (!Array.isArray(sections[s.key])) sections[s.key] = []; });
   let date = item.ShiftDate || '';
   if (date && date.length > 10) date = date.slice(0, 10);
@@ -785,7 +931,8 @@ function spToModel(item){
     shiftDate: date,
     shift: item.Shift || 'Day',
     qaResource: item.QAResource || '',
-    sections
+    sections,
+    fileRefs
   };
 }
 
@@ -795,7 +942,7 @@ function modelToSp(model){
     ShiftDate: model.shiftDate ? model.shiftDate + 'T00:00:00Z' : null,
     Shift: model.shift,
     QAResource: model.qaResource,
-    Payload: JSON.stringify(model.sections || {})
+    Payload: JSON.stringify({ sections: model.sections || {}, fileRefs: model.fileRefs || [] })
   };
 }
 
@@ -807,7 +954,7 @@ function buildTitle(m){
    STORAGE INTERFACE — dispatches to SharePoint or localStorage.
    UI code is identical in both modes.
    ============================================================ */
-const LS_KEY = 'qaEndorsements.v1';
+const LS_KEY = 'qaEndorsements.v2';
 
 function lsRead(){
   try {
@@ -901,6 +1048,12 @@ function statusPill(key){
   const m = statusMeta(key);
   return `<span class="st" style="--sc:var(${m.token})"><span class="g">${m.glyph}</span>${esc(m.key)}</span>`;
 }
+function fileRefLineHtml(r){
+  const label = esc(r.name || r.url || 'file');
+  const nameHtml = r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${label}</a>` : label;
+  const noteHtml = r.note ? ` <span class="lnote">— ${esc(r.note)}</span>` : '';
+  return `<li><span class="lx lfile">📎</span><span class="ln">${nameHtml}${noteHtml}</span></li>`;
+}
 function fmtDate(d){
   if (!d) return '';
   const parts = d.split('-');
@@ -946,7 +1099,7 @@ function renderDashboard(){
   const sampleNote = store.mode === 'demo'
     ? `<span class="sample-note">◐ Sample data — not your team's real figures</span>` : '';
 
-  const tiles = [{key:'__all', label:'Total AXOs', token:'--accent', val:total}]
+  const tiles = [{key:'__all', label:'Total AXOs', token:'--brand-2', val:total}]
     .concat(STATUSES.map(s => ({ key:s.key, label:s.key, token:s.token, val:counts[s.key]||0 })))
     .map(t => `
       <button class="tile" style="--tc:var(${t.token})" data-filter="${t.key==='__all'?'all':esc(t.key)}" title="View in AXO Tracker">
@@ -1146,7 +1299,16 @@ function renderLog(){
   }
 
   const cards = list.map(e => {
-    const secs = SECTIONS.map(s => {
+    const secs = orderedBlocks().map(b => {
+      if (b.type === 'file'){
+        const refs = fileRefsOf(e);
+        const inner = refs.length
+          ? `<ul class="sec-lines">${refs.map(fileRefLineHtml).join('')}</ul>`
+          : `<div class="sec-empty">— none —</div>`;
+        return `<div class="sec-block">
+            <div class="sec-title"><span class="n">${b.field.num}.</span>${esc(b.field.title)}</div>${inner}</div>`;
+      }
+      const s = b.section;
       const rows = (e.sections && e.sections[s.key]) || [];
       let inner;
       if (!rows.length){
@@ -1155,7 +1317,7 @@ function renderLog(){
         inner = `<ul class="sec-lines">${rows.map(r => `
             <li><span class="lx">•</span><span class="la">${esc(r.axo)}</span>
               <span class="ln">${esc(r.note)||'—'}</span>
-              <span class="lst">${statusPill(r.status||'Not Tested')}</span></li>`).join('')}</ul>`;
+              <span class="lst">${statusPill(r.status||defaultStatusFor(s.key))}</span></li>`).join('')}</ul>`;
       } else {
         inner = `<ul class="sec-lines">${rows.map(r => `
             <li><span class="lx">•</span><span class="ln">${esc(r.note)||'—'}</span></li>`).join('')}</ul>`;
@@ -1181,7 +1343,7 @@ function renderLog(){
   }).join('');
 
   $('#view-log').innerHTML = `
-    <div class="section-head"><h2>Shift Log</h2><span class="hint">Every handover in the original six-section format, newest first.</span></div>
+    <div class="section-head"><h2>Shift Log</h2><span class="hint">Every handover in the Endorsement of Tasks format, newest first.</span></div>
     <div class="log-list">${cards}</div>`;
 
   $$('#view-log [data-edit]').forEach(b => b.addEventListener('click', () => openForm(b.dataset.edit)));
@@ -1209,64 +1371,81 @@ function openForm(id){
   switchTab('new');
 }
 
+function sectionAccentToken(s){
+  if (!s.axo || !s.defaultStatus) return '--brand-2';
+  return statusMeta(s.defaultStatus).token;
+}
+
 function renderForm(){
   const editing = state.editingId ? state.endorsements.find(e => String(e.id) === String(state.editingId)) : null;
   const today = new Date().toISOString().slice(0, 10);
-  const model = editing || { shiftDate: today, shift: 'Day', qaResource: '', sections: {} };
+  const model = editing || { shiftDate: today, shift: 'Day', qaResource: '', sections: {}, fileRefs: [] };
 
-  const statusOpts = sel => STATUSES.map(s => `<option value="${esc(s.key)}"${s.key===sel?' selected':''}>${esc(s.key)}</option>`).join('');
-
-  const axoSections = SECTIONS.filter(s => s.axo).map(s => {
+  const blocksHtml = orderedBlocks().map(b => {
+    if (b.type === 'file'){
+      const refs = fileRefsOf(model);
+      const linesHtml = refs.map(r => fileLineHtml(r.name, r.url, r.note)).join('')
+        || `<div class="lines-empty">No file references yet — add one if the next shift needs to continue from a file.</div>`;
+      return `<div class="fsec" data-filefield style="--sc:var(--brand-2)">
+          <div class="fsec-head">
+            <span class="n">${FILE_FIELD.num}</span><h3>${esc(FILE_FIELD.lead)}</h3>
+            <span class="addln"><button type="button" class="iconbtn" data-add="__file">+ Add file reference</button></span>
+          </div>
+          <p class="fsec-hint">${esc(FILE_FIELD.hint)}</p>
+          <div class="lines" data-lines="__file">${linesHtml}</div>
+        </div>`;
+    }
+    const s = b.section;
     const rows = (model.sections && model.sections[s.key]) || [];
-    const linesHtml = (rows.length ? rows : []).map(r => axoLineHtml(s.key, r.axo, r.note, r.status)).join('');
-    return `<div class="fsec" data-section="${s.key}">
+    const addLabel = s.axo ? '+ Add AXO line' : '+ Add line';
+    const emptyMsg = s.axo
+      ? 'No lines yet — add an AXO if this section applies to your shift.'
+      : 'No lines yet — add a note if this applies.';
+    const linesHtml = rows.length
+      ? rows.map(r => s.axo ? axoLineHtml(r.axo, r.note, r.status || s.defaultStatus) : nonAxoLineHtml(r.note)).join('')
+      : `<div class="lines-empty">${emptyMsg}</div>`;
+    return `<div class="fsec" data-section="${s.key}" style="--sc:var(${sectionAccentToken(s)})">
         <div class="fsec-head">
-          <span class="n">${s.num}.</span><h3>${esc(s.title)}</h3>
-          <span class="addln"><button type="button" class="iconbtn" data-add="${s.key}">+ Add line</button></span>
+          <span class="n">${s.num}</span><h3>${esc(s.lead)}</h3>
+          <span class="addln"><button type="button" class="iconbtn" data-add="${s.key}">${addLabel}</button></span>
         </div>
+        ${s.hint ? `<p class="fsec-hint">${esc(s.hint)}</p>` : ''}
         <div class="lines" data-lines="${s.key}">${linesHtml}</div>
       </div>`;
   }).join('');
 
-  const nonAxoRows = (model.sections && model.sections.nonAxo) || [];
-  const nonAxoHtml = nonAxoRows.map(r => nonAxoLineHtml(r.note)).join('');
-
   $('#view-new').innerHTML = `
     <div class="section-head">
-      <h2>${editing ? 'Edit Endorsement' : 'New Endorsement'}</h2>
-      <span class="hint">${editing ? 'Update this shift handover for the whole team.' : 'Log a shift handover in the standard six-section format.'}</span>
+      <h2>${editing ? 'Edit Endorsement' : 'Endorsement of Tasks'}</h2>
+      <span class="hint">${editing ? 'Update this shift handover for the whole team.' : 'Log a shift handover. Every field is optional — fill in only what applies.'}</span>
     </div>
-    <form class="card card-pad" id="endoForm" autocomplete="off">
-      <div class="form-grid">
-        <label class="fld">Shift date
+    <form id="endoForm" autocomplete="off">
+      <div class="form-head">
+        <label class="fld">Date
           <input type="date" id="fDate" value="${esc(model.shiftDate)}" required></label>
+        <label class="fld">QA Resource
+          <input type="text" id="fQA" value="${esc(model.qaResource)}" placeholder="Select / enter a QA" required></label>
         <label class="fld">Shift
           <select id="fShift">${['Day','Mid','Night'].map(s => `<option${s===model.shift?' selected':''}>${s}</option>`).join('')}</select></label>
-        <label class="fld">QA resource
-          <input type="text" id="fQA" value="${esc(model.qaResource)}" placeholder="e.g. Juan" required></label>
       </div>
-      ${axoSections}
-      <div class="fsec" data-section="nonAxo">
-        <div class="fsec-head">
-          <span class="n">6.</span><h3>Non-AXO items</h3>
-          <span class="addln"><button type="button" class="iconbtn" data-add="nonAxo">+ Add line</button></span>
-        </div>
-        <div class="lines" data-lines="nonAxo">${nonAxoHtml}</div>
-      </div>
+      ${blocksHtml}
       <div class="form-actions">
-        ${editing ? '<button type="button" class="iconbtn" id="fCancel">Cancel edit</button>' : ''}
+        <span class="hint">Date and QA Resource are required to save; everything else is optional.</span>
         <span class="sp"></span>
+        ${editing ? '<button type="button" class="iconbtn" id="fCancel">Cancel</button>' : ''}
         <button type="submit" class="iconbtn primary" id="fSave">${editing ? 'Update endorsement' : 'Save endorsement'}</button>
       </div>
     </form>`;
 
-  const statusTemplate = statusOpts;
-
   $$('#view-new [data-add]').forEach(b => b.addEventListener('click', () => {
     const key = b.dataset.add;
     const container = $(`#view-new [data-lines="${key}"]`);
+    const emptyEl = container.querySelector('.lines-empty');
+    if (emptyEl) emptyEl.remove();
     const wrap = document.createElement('div');
-    wrap.innerHTML = key === 'nonAxo' ? nonAxoLineHtml('') : axoLineHtml(key, '', '', 'Not Tested');
+    if (key === '__file') wrap.innerHTML = fileLineHtml('', '', '');
+    else if (key === 'nonAxo') wrap.innerHTML = nonAxoLineHtml('');
+    else wrap.innerHTML = axoLineHtml('', '', defaultStatusFor(key));
     const node = wrap.firstElementChild;
     container.appendChild(node);
     bindRemove(node);
@@ -1279,24 +1458,29 @@ function renderForm(){
   if (cancel) cancel.addEventListener('click', () => { state.editingId = null; switchTab('log'); });
 
   $('#endoForm').addEventListener('submit', onSaveForm);
-
-  // populate status selects (built via template string already set their selected)
-  void statusTemplate;
 }
 
-function axoLineHtml(sectionKey, axo, note, status){
+function axoLineHtml(axo, note, status){
   const opts = STATUSES.map(s => `<option value="${esc(s.key)}"${s.key===(status||'Not Tested')?' selected':''}>${esc(s.key)}</option>`).join('');
   return `<div class="line-row">
       <input type="text" inputmode="numeric" class="l-axo" placeholder="AXO #" value="${esc(axo||'')}">
       <input type="text" class="l-note note-cell" placeholder="What happened / status note" value="${esc(note||'')}">
-      <select class="l-status">${opts}</select>
+      <select class="l-status" aria-label="AXO status">${opts}</select>
       <button type="button" class="rm-line" title="Remove line" aria-label="Remove line">&times;</button>
     </div>`;
 }
 function nonAxoLineHtml(note){
   return `<div class="line-row nonaxo">
-      <input type="text" class="l-note" placeholder="Non-AXO note (process, tooling, environment…)" value="${esc(note||'')}">
+      <input type="text" class="l-note" placeholder="Non-AXO note (regression, end-to-end, tooling, environment…)" value="${esc(note||'')}">
       <button type="button" class="rm-line" title="Remove line" aria-label="Remove line">&times;</button>
+    </div>`;
+}
+function fileLineHtml(name, url, note){
+  return `<div class="line-row file-row">
+      <input type="text" class="f-name" placeholder="File name / label" value="${esc(name||'')}">
+      <input type="url" class="f-url" placeholder="Link (optional) — SharePoint/Drive URL" value="${esc(url||'')}">
+      <input type="text" class="f-note" placeholder="Note (optional)" value="${esc(note||'')}">
+      <button type="button" class="rm-line" title="Remove file reference" aria-label="Remove file reference">&times;</button>
     </div>`;
 }
 function bindRemove(node){
@@ -1329,12 +1513,24 @@ async function onSaveForm(ev){
     sections[s.key] = rows;
   });
 
+  const fileRefs = [];
+  const fileContainer = $('#view-new [data-lines="__file"]');
+  if (fileContainer){
+    fileContainer.querySelectorAll('.line-row.file-row').forEach(r => {
+      const name = r.querySelector('.f-name').value.trim();
+      const url = r.querySelector('.f-url').value.trim();
+      const note = r.querySelector('.f-note').value.trim();
+      if (name || url || note) fileRefs.push({ name, url, note });
+    });
+  }
+
   const editing = state.editingId ? state.endorsements.find(e => String(e.id) === String(state.editingId)) : null;
   const model = {
     id: editing ? editing.id : undefined,
     shiftDate, shift, qaResource,
     title: buildTitle({ shiftDate, shift, qaResource }),
-    sections
+    sections,
+    fileRefs
   };
 
   const saveBtn = $('#fSave'); saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
@@ -1360,14 +1556,28 @@ function latestEndorsement(){
 function buildSlackText(e){
   if (!e) return '';
   const lines = [];
-  lines.push(`*QA Endorsement — ${e.shiftDate} ${e.shift} — ${e.qaResource}*`);
+  lines.push(`*Endorsement of Tasks — ${e.shiftDate} ${e.shift} — ${e.qaResource}*`);
   lines.push('');
-  SECTIONS.forEach(s => {
-    lines.push(`*${s.num}. ${s.title}*`);
+  orderedBlocks().forEach(b => {
+    if (b.type === 'file'){
+      lines.push(`*${b.field.title}*`);
+      const refs = fileRefsOf(e);
+      if (!refs.length){ lines.push('• —'); }
+      else refs.forEach(r => {
+        const parts = [r.name || r.url || 'file'];
+        if (r.url && r.name) parts.push(r.url);
+        if (r.note) parts.push(r.note);
+        lines.push('• ' + parts.join(' — '));
+      });
+      lines.push('');
+      return;
+    }
+    const s = b.section;
+    lines.push(`*${s.title}*`);
     const rows = (e.sections && e.sections[s.key]) || [];
     if (!rows.length){ lines.push('• —'); }
     else if (s.axo){
-      rows.forEach(r => lines.push(`• AXO ${r.axo} — ${r.note || ''} (${r.status || 'Not Tested'})`));
+      rows.forEach(r => lines.push(`• AXO ${r.axo} — ${r.note || ''} (${r.status || s.defaultStatus})`));
     } else {
       rows.forEach(r => lines.push(`• ${r.note || ''}`));
     }
