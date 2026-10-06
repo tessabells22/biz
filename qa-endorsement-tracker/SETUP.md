@@ -9,7 +9,10 @@ step, no dependencies, no CDNs — it runs offline from any SharePoint page.
 > **NPD QA** label) and the product is named **NPD QA Endorsement Tracker**. The
 > verbatim Slack field **`QA Resource`** is unchanged. See §6.
 
-The form mirrors the real Slack **"Endorsement of Tasks"** modal field-for-field
+Entries go in through **one unified AXO row builder** — add an AXO, pick its status,
+and the status files it into the correct Slack section automatically (no more filling
+seven separate section blocks). The Shift Log cards and the "Copy latest as Slack"
+output still mirror the real Slack **"Endorsement of Tasks"** modal field-for-field
 (see "Field structure" below). Each handover is stored as **one list item**: all of
 its sections *and* its file references are kept as JSON in a single text column, so
 list setup is trivial and the structure is preserved exactly.
@@ -44,28 +47,33 @@ a column already exists with a different internal name, recreate it or adjust th
 
 ## Field structure — the "Endorsement of Tasks" form
 
-The New/Edit Endorsement form, the Shift Log cards, and the "Copy latest as Slack"
-output all use these labels **verbatim** from the Slack modal, in this order:
+The Shift Log cards and the "Copy latest as Slack" output use these labels
+**verbatim** from the Slack modal, in this order. In the New/Edit Endorsement
+builder you don't pick a section directly — you pick a **status** on each AXO row
+and it routes into the matching section below (status → section mapping noted inline):
 
 1. **Date** *(required to save)*
 2. **QA Resource** *(required to save)* — plus an operational **Shift** selector
    (Day / Mid / Night) the tool adds for cross-shift ordering.
-3. **Worked On during Shift and Status** — per-AXO lines, default status *In Progress*.
+3. **Worked On during Shift and Status** — status *In Progress*, *Passed*, or *Failed*.
 4. **Needs Monitoring for Develop/Deployment Server - (AXOs that are already in the
-   canvass but hasn't been crossed out)** — default status *Needs Monitoring*.
-5. **Needs Continuation Test File Upload** — file references (see below).
+   canvass but hasn't been crossed out)** — status *Needs Monitoring*.
+5. **Needs Continuation Test File Upload** — file references (see below); a
+   collapsible panel in the builder.
 6. **Blocker Issue that needs Urgency (Include the affected AXO No. if any and the
-   Title raised in Blocker for easy search)** — default status *Blocked*.
-7. **Urgent and High Prio** — default status *Urgent/High Prio*.
-8. **Not Yet Tested** — default status *Not Tested*.
+   Title raised in Blocker for easy search)** — status *Blocked*.
+7. **Urgent and High Prio** — status *Urgent/High Prio*.
+8. **Not Yet Tested** — status *Not Tested*.
 9. **Non AXO Related but needs Attention - Regression, end-to-end ETC** — free-text
-   lines, no AXO / no status column.
+   lines, no AXO / no status; a collapsible panel in the builder.
 
 Every field is optional in Slack; the tool only requires **Date** and
-**QA Resource** so each item can be labelled and ordered. Each AXO line carries a
-per-AXO **status** dropdown (the tool's value-add) that defaults sensibly per
-section and is fully overridable (Not Tested / In Progress / Needs Monitoring /
-Urgent-High Prio / Blocked / Failed / Passed).
+**QA Resource** so each item can be labelled and ordered. The builder also
+remembers the last-used QA Resource and Shift (and defaults Date to today), and
+shows a live Slack preview that matches the "Copy" output exactly. The status set is
+Not Tested / In Progress / Needs Monitoring / Urgent-High Prio / Blocked / Failed /
+Passed; *In Progress*, *Passed*, and *Failed* all live under **Worked On during
+Shift and Status**.
 
 ### File references ("Needs Continuation Test File Upload")
 

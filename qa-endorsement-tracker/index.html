@@ -443,6 +443,64 @@
   .form-actions .sp{margin-left:auto}
   .form-actions .hint{font-size:12px;color:var(--muted)}
 
+  /* ---------- Unified AXO row builder ---------- */
+  .builder-grid{display:grid;grid-template-columns:minmax(0,1fr) 352px;gap:18px;align-items:start}
+  @media(max-width:900px){.builder-grid{grid-template-columns:1fr}}
+  .builder-main{min-width:0;display:flex;flex-direction:column;gap:14px}
+
+  /* quick add control */
+  .qa-add{padding:14px 16px}
+  .qa-add-row{display:grid;grid-template-columns:128px 182px minmax(0,1fr) auto;gap:8px;align-items:center}
+  .qa-add-row .qa-note{min-width:0}
+  @media(max-width:620px){
+    .qa-add-row{grid-template-columns:1fr 1fr}
+    .qa-add-row .qa-note{grid-column:1/3}
+    .qa-add-row #qAdd{grid-column:1/3}
+  }
+  .qa-add-hint{margin:9px 2px 0;font-size:11.5px;color:var(--muted);line-height:1.4}
+  .qa-add-hint kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:0 5px}
+
+  /* added rows, grouped by derived section */
+  .brow-group{display:flex;flex-direction:column;gap:9px}
+  .brow-group + .brow-group{margin-top:16px}
+  .brow-group-h{font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-2);display:flex;align-items:center;gap:8px;line-height:1.3}
+  .brow-group-h .n{color:var(--accent-ink);font-variant-numeric:tabular-nums;flex:none}
+  .brow-group-h .brow-cnt{margin-left:auto;flex:none;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);padding:1px 8px;border-radius:999px;min-width:20px;text-align:center}
+  .brows{display:flex;flex-direction:column;gap:8px}
+  .brow{display:grid;grid-template-columns:116px 174px minmax(0,1fr) 34px;gap:8px;align-items:center;
+    border-left:3px solid var(--sc,var(--muted));padding:6px 0 6px 11px}
+  .brow .b-note{min-width:0}
+  @media(max-width:620px){
+    .brow{grid-template-columns:1fr 1fr}
+    .brow .b-note{grid-column:1/3}
+    .brow .b-rm{grid-row:1;grid-column:2;justify-self:end;width:40px}
+  }
+  .builder-empty{font-size:13px;color:var(--muted);text-align:center;padding:30px 18px;
+    border:1px dashed var(--border);border-radius:var(--radius);background:var(--surface-2)}
+  .builder-empty b{color:var(--fg-2);font-weight:600}
+
+  /* collapsible extras */
+  .extras{display:flex;flex-direction:column;gap:12px}
+  .extra{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+  .extra > summary{list-style:none;cursor:pointer;padding:12px 16px;font-size:12.5px;font-weight:650;color:var(--fg-2);display:flex;align-items:center;gap:10px}
+  .extra > summary::-webkit-details-marker{display:none}
+  .extra > summary::before{content:"\25B8";color:var(--muted);font-size:11px;transition:transform .15s;flex:none}
+  .extra[open] > summary::before{transform:rotate(90deg)}
+  .extra > summary:hover{color:var(--fg)}
+  .extra > summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .extra .ex-cnt{margin-left:auto;flex:none;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);padding:1px 8px;border-radius:999px;min-width:20px;text-align:center}
+  .extra-body{padding:12px 16px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:11px}
+  .extra-body .fsec-hint{margin:0 0 2px}
+  .extra-body .add-ln{align-self:flex-start}
+
+  /* live Slack preview rail */
+  .preview-rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 14px)}
+  .preview-card{padding:14px 16px}
+  .preview-h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-2);display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  .preview-h .pdot{width:8px;height:8px;border-radius:50%;background:var(--brand-2);flex:none}
+  .preview-pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;color:var(--fg);max-height:58vh;overflow:auto}
+  .preview-note{font-size:11px;color:var(--muted);margin:11px 0 0;line-height:1.4}
+
   /* ---------- Empty state ---------- */
   .empty-state{text-align:center;padding:52px 20px;color:var(--muted)}
   .empty-state .es-ic{font-size:34px;opacity:.5}
@@ -656,6 +714,84 @@ function orderedBlocks(){
 function defaultStatusFor(sectionKey){
   const s = SECTIONS.find(x => x.key === sectionKey);
   return (s && s.defaultStatus) || 'Not Tested';
+}
+
+/* Ordered AXO-section keys (Slack order), used to flatten a stored endorsement
+   into builder rows and back. */
+const AXO_SECTION_KEYS = SECTIONS.filter(s => s.axo).map(s => s.key);
+
+/* STATUS → stored section key. In the unified row builder, picking a status is
+   what files an AXO into a section bucket. This is the SAME bucket the old
+   sectioned form used, so the stored payload, derivation, Shift Log and
+   Slack-copy output are all unchanged. In Progress / Passed / Failed all live
+   under "Worked On during Shift and Status". */
+const STATUS_SECTION = {
+  'Not Tested':       'notTested',
+  'In Progress':      'workedOn',
+  'Passed':           'workedOn',
+  'Failed':           'workedOn',
+  'Needs Monitoring': 'needsMonitoring',
+  'Urgent/High Prio': 'urgent',
+  'Blocked':          'blocker'
+};
+function sectionForStatus(status){
+  return STATUS_SECTION[status] || 'workedOn';
+}
+
+/* Flatten a stored endorsement into the builder's working draft:
+     { rows:[{axo,status,note,section}], nonAxo:[{note}], fileRefs:[{name,url,note}] }
+   Each AXO row carries the section key it currently lives in, so an unchanged
+   round-trip is lossless; changing a row's status re-routes it via
+   sectionForStatus. */
+function draftFromModel(model){
+  const rows = [];
+  const sections = (model && model.sections) || {};
+  AXO_SECTION_KEYS.forEach(key => {
+    const list = Array.isArray(sections[key]) ? sections[key] : [];
+    list.forEach(r => {
+      if (!r) return;
+      rows.push({
+        axo: String(r.axo == null ? '' : r.axo),
+        status: r.status || defaultStatusFor(key),
+        note: r.note || '',
+        section: key
+      });
+    });
+  });
+  const nonAxo = (Array.isArray(sections.nonAxo) ? sections.nonAxo : [])
+    .map(r => ({ note: (r && r.note) || '' }));
+  const fileRefs = fileRefsOf(model).map(r => ({ name: r.name || '', url: r.url || '', note: r.note || '' }));
+  return { rows, nonAxo, fileRefs };
+}
+
+/* Serialize a header + builder draft back into the stored endorsement payload
+   shape. AXO rows bucket by their section key (kept in sync with status); empty
+   rows are dropped. This is the one place Save and the live preview both use, so
+   preview === Copy output. */
+function buildModelFromDraft(header, draft){
+  const sections = {};
+  SECTIONS.forEach(s => { sections[s.key] = []; });
+  (draft.rows || []).forEach(r => {
+    const axo = (r.axo || '').trim();
+    const note = (r.note || '').trim();
+    if (!axo && !note) return;
+    const status = r.status || 'Not Tested';
+    const key = r.section || sectionForStatus(status);
+    (sections[key] || (sections[key] = [])).push({ axo, note, status });
+  });
+  sections.nonAxo = (draft.nonAxo || [])
+    .map(n => ({ note: (n.note || '').trim() }))
+    .filter(n => n.note);
+  const fileRefs = (draft.fileRefs || [])
+    .map(f => ({ name: (f.name || '').trim(), url: (f.url || '').trim(), note: (f.note || '').trim() }))
+    .filter(f => f.name || f.url || f.note);
+  return {
+    shiftDate: header.shiftDate || '',
+    shift: header.shift || 'Day',
+    qaResource: (header.qaResource || '').trim(),
+    sections,
+    fileRefs
+  };
 }
 
 /* Normalize an endorsement's file references to [{name,url,note}]. */
@@ -1072,7 +1208,8 @@ const state = {
   search: '',
   statusFilter: 'all',
   expanded: new Set(),
-  editingId: null
+  editingId: null,
+  draft: { rows: [], nonAxo: [], fileRefs: [] }
 };
 
 const $ = sel => document.querySelector(sel);
@@ -1406,167 +1543,287 @@ function openForm(id){
   switchTab('new');
 }
 
-function sectionAccentToken(s){
-  if (!s.axo || !s.defaultStatus) return '--brand-2';
-  return statusMeta(s.defaultStatus).token;
+/* localStorage conveniences: last-used QA Resource + Shift, so the next
+   endorsement starts pre-filled. Date always defaults to today. */
+function lsGet(key, fallback){
+  try { const v = localStorage.getItem(key); return v == null ? fallback : v; }
+  catch (e){ return fallback; }
+}
+function lsSet(key, val){ try { localStorage.setItem(key, val); } catch (e){} }
+
+function sectionByKey(key){ return SECTIONS.find(s => s.key === key) || {}; }
+
+/* Status dropdown, grouped so the routing is legible: the three results that
+   live under "Worked On" first, then the statuses that each own a section. */
+const STATUS_GROUPS = [
+  { label:'Worked On during Shift',    statuses:['In Progress','Passed','Failed'] },
+  { label:'Routes to its own section', statuses:['Not Tested','Needs Monitoring','Urgent/High Prio','Blocked'] }
+];
+function statusOptionsHtml(selected){
+  return STATUS_GROUPS.map(g =>
+    `<optgroup label="${esc(g.label)}">` +
+    g.statuses.map(k => `<option value="${esc(k)}"${k===selected?' selected':''}>${esc(k)}</option>`).join('') +
+    `</optgroup>`
+  ).join('');
+}
+
+function readHeader(){
+  const d = $('#fDate'), s = $('#fShift'), q = $('#fQA');
+  return {
+    shiftDate: d ? d.value : '',
+    shift: s ? s.value : 'Day',
+    qaResource: q ? q.value : ''
+  };
 }
 
 function renderForm(){
   const editing = state.editingId ? state.endorsements.find(e => String(e.id) === String(state.editingId)) : null;
   const today = new Date().toISOString().slice(0, 10);
-  const model = editing || { shiftDate: today, shift: 'Day', qaResource: '', sections: {}, fileRefs: [] };
+  const model = editing || {
+    shiftDate: today,
+    shift: lsGet('qaLastShift', 'Day'),
+    qaResource: lsGet('qaLastResource', ''),
+    sections: {},
+    fileRefs: []
+  };
+  state.draft = draftFromModel(model);
 
-  const blocksHtml = orderedBlocks().map(b => {
-    if (b.type === 'file'){
-      const refs = fileRefsOf(model);
-      const linesHtml = refs.map(r => fileLineHtml(r.name, r.url, r.note)).join('')
-        || `<div class="lines-empty">No file references yet — add one if the next shift needs to continue from a file.</div>`;
-      return `<div class="fsec" data-filefield style="--sc:var(--brand-2)">
-          <div class="fsec-head">
-            <span class="n">${FILE_FIELD.num}</span><h3>${esc(FILE_FIELD.lead)}</h3>
-            <span class="addln"><button type="button" class="iconbtn" data-add="__file">+ Add file reference</button></span>
-          </div>
-          <p class="fsec-hint">${esc(FILE_FIELD.hint)}</p>
-          <div class="lines" data-lines="__file">${linesHtml}</div>
-        </div>`;
-    }
-    const s = b.section;
-    const rows = (model.sections && model.sections[s.key]) || [];
-    const addLabel = s.axo ? '+ Add AXO line' : '+ Add line';
-    const emptyMsg = s.axo
-      ? 'No lines yet — add an AXO if this section applies to your shift.'
-      : 'No lines yet — add a note if this applies.';
-    const linesHtml = rows.length
-      ? rows.map(r => s.axo ? axoLineHtml(r.axo, r.note, r.status || s.defaultStatus) : nonAxoLineHtml(r.note)).join('')
-      : `<div class="lines-empty">${emptyMsg}</div>`;
-    return `<div class="fsec" data-section="${s.key}" style="--sc:var(${sectionAccentToken(s)})">
-        <div class="fsec-head">
-          <span class="n">${s.num}</span><h3>${esc(s.lead)}</h3>
-          <span class="addln"><button type="button" class="iconbtn" data-add="${s.key}">${addLabel}</button></span>
-        </div>
-        ${s.hint ? `<p class="fsec-hint">${esc(s.hint)}</p>` : ''}
-        <div class="lines" data-lines="${s.key}">${linesHtml}</div>
-      </div>`;
-  }).join('');
+  const knownQA = Array.from(new Set(state.endorsements.map(e => e.qaResource).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b));
+  const qaDatalist = knownQA.map(n => `<option value="${esc(n)}"></option>`).join('');
 
   $('#view-new').innerHTML = `
     <div class="section-head">
-      <h2>${editing ? 'Edit Endorsement' : 'Endorsement of Tasks'}</h2>
-      <span class="hint">${editing ? 'Update this shift handover for the whole team.' : 'Log a shift handover. Every field is optional — fill in only what applies.'}</span>
+      <h2>${editing ? 'Edit Endorsement' : 'New Endorsement'}</h2>
+      <span class="hint">${editing
+        ? 'Update this shift handover for the whole team.'
+        : 'Add one AXO at a time — its status files it into the right Slack section automatically.'}</span>
     </div>
     <form id="endoForm" autocomplete="off">
-      <div class="form-head">
-        <label class="fld">Date
-          <input type="date" id="fDate" value="${esc(model.shiftDate)}" required></label>
-        <label class="fld">QA Resource
-          <input type="text" id="fQA" value="${esc(model.qaResource)}" placeholder="Select / enter a QA" required></label>
-        <label class="fld">Shift
-          <select id="fShift">${['Day','Mid','Night'].map(s => `<option${s===model.shift?' selected':''}>${s}</option>`).join('')}</select></label>
+      <div class="builder-grid">
+        <div class="builder-main">
+          <div class="form-head">
+            <label class="fld">Date
+              <input type="date" id="fDate" value="${esc(model.shiftDate)}" required></label>
+            <label class="fld">QA Resource
+              <input type="text" id="fQA" list="qaResourceList" value="${esc(model.qaResource)}" placeholder="Select or type a QA" required>
+              <datalist id="qaResourceList">${qaDatalist}</datalist></label>
+            <label class="fld">Shift
+              <select id="fShift">${['Day','Mid','Night'].map(s => `<option${s===model.shift?' selected':''}>${s}</option>`).join('')}</select></label>
+          </div>
+
+          <div class="qa-add card">
+            <div class="qa-add-row">
+              <input type="text" inputmode="numeric" id="qAxo" class="qa-axo" placeholder="AXO #" aria-label="AXO number">
+              <select id="qStatus" class="qa-status" aria-label="Status">${statusOptionsHtml('In Progress')}</select>
+              <input type="text" id="qNote" class="qa-note" placeholder="Note (optional)" aria-label="Note">
+              <button type="button" class="iconbtn primary" id="qAdd">+ Add</button>
+            </div>
+            <p class="qa-add-hint">Pick a status — it files the AXO under the right section automatically. Press <kbd>Enter</kbd> in the AXO or note field to add and keep going.</p>
+          </div>
+
+          <div id="builderRows"></div>
+
+          <div class="extras">
+            <details class="extra" id="extraNonAxo">
+              <summary>${esc(sectionByKey('nonAxo').title)}<span class="ex-cnt" id="nonAxoCnt">0</span></summary>
+              <div class="extra-body">
+                <div class="lines" id="nonAxoLines"></div>
+                <button type="button" class="iconbtn add-ln" id="addNonAxo">+ Add line</button>
+              </div>
+            </details>
+            <details class="extra" id="extraFiles">
+              <summary>${esc(FILE_FIELD.title)}<span class="ex-cnt" id="filesCnt">0</span></summary>
+              <div class="extra-body">
+                <p class="fsec-hint">${esc(FILE_FIELD.hint)}</p>
+                <div class="lines" id="fileLines"></div>
+                <button type="button" class="iconbtn add-ln" id="addFile">+ Add file reference</button>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <aside class="preview-rail">
+          <div class="card preview-card">
+            <div class="preview-h"><span class="pdot"></span>Slack handover preview</div>
+            <pre class="preview-pre" id="slackPreview" aria-live="polite"></pre>
+            <p class="preview-note">Exactly what the Slack "Copy" button will produce once this is saved.</p>
+          </div>
+        </aside>
       </div>
-      ${blocksHtml}
+
       <div class="form-actions">
         <span class="hint">Date and QA Resource are required to save; everything else is optional.</span>
         <span class="sp"></span>
-        ${editing ? '<button type="button" class="iconbtn" id="fCancel">Cancel</button>' : ''}
+        <button type="button" class="iconbtn" id="fCancel">Cancel</button>
         <button type="submit" class="iconbtn primary" id="fSave">${editing ? 'Update endorsement' : 'Save endorsement'}</button>
       </div>
     </form>`;
 
-  $$('#view-new [data-add]').forEach(b => b.addEventListener('click', () => {
-    const key = b.dataset.add;
-    const container = $(`#view-new [data-lines="${key}"]`);
-    const emptyEl = container.querySelector('.lines-empty');
-    if (emptyEl) emptyEl.remove();
-    const wrap = document.createElement('div');
-    if (key === '__file') wrap.innerHTML = fileLineHtml('', '', '');
-    else if (key === 'nonAxo') wrap.innerHTML = nonAxoLineHtml('');
-    else wrap.innerHTML = axoLineHtml('', '', defaultStatusFor(key));
-    const node = wrap.firstElementChild;
-    container.appendChild(node);
-    bindRemove(node);
-    const first = node.querySelector('input'); if (first) first.focus();
-  }));
+  renderBuilderRows();
+  renderNonAxo();
+  renderFiles();
+  if (state.draft.nonAxo.length){ const el = $('#extraNonAxo'); if (el) el.open = true; }
+  if (state.draft.fileRefs.length){ const el = $('#extraFiles'); if (el) el.open = true; }
+  renderPreview();
 
-  $$('#view-new .line-row').forEach(bindRemove);
-
-  const cancel = $('#fCancel');
-  if (cancel) cancel.addEventListener('click', () => { state.editingId = null; switchTab('log'); });
-
-  $('#endoForm').addEventListener('submit', onSaveForm);
+  // Delegated handlers on the freshly-built form (so they never stack across renders).
+  const form = $('#endoForm');
+  form.addEventListener('input', onBuilderInput);
+  form.addEventListener('change', onBuilderChange);
+  form.addEventListener('click', onBuilderClick);
+  form.addEventListener('submit', onSaveForm);
+  ['qAxo','qNote'].forEach(id => {
+    const el = $('#' + id);
+    if (el) el.addEventListener('keydown', ev => { if (ev.key === 'Enter'){ ev.preventDefault(); addQuickRow(); } });
+  });
+  $('#fCancel').addEventListener('click', () => { state.editingId = null; switchTab(editing ? 'log' : 'dashboard'); });
 }
 
-function axoLineHtml(axo, note, status){
-  const opts = STATUSES.map(s => `<option value="${esc(s.key)}"${s.key===(status||'Not Tested')?' selected':''}>${esc(s.key)}</option>`).join('');
-  return `<div class="line-row">
-      <input type="text" inputmode="numeric" class="l-axo" placeholder="AXO #" value="${esc(axo||'')}">
-      <input type="text" class="l-note note-cell" placeholder="What happened / status note" value="${esc(note||'')}">
-      <select class="l-status" aria-label="AXO status">${opts}</select>
-      <button type="button" class="rm-line" title="Remove line" aria-label="Remove line">&times;</button>
+/* ---------- builder: added rows, grouped by derived section ---------- */
+function builderRowHtml(r, idx){
+  const tok = statusMeta(r.status).token;
+  return `<div class="brow" data-idx="${idx}" style="--sc:var(${tok})">
+      <input type="text" inputmode="numeric" class="b-axo" placeholder="AXO #" value="${esc(r.axo)}" aria-label="AXO number">
+      <select class="b-status" aria-label="Status">${statusOptionsHtml(r.status)}</select>
+      <input type="text" class="b-note" placeholder="Note (optional)" value="${esc(r.note)}" aria-label="Note">
+      <button type="button" class="rm-line b-rm" title="Remove AXO" aria-label="Remove AXO">&times;</button>
     </div>`;
 }
-function nonAxoLineHtml(note){
-  return `<div class="line-row nonaxo">
-      <input type="text" class="l-note" placeholder="Non-AXO note (regression, end-to-end, tooling, environment…)" value="${esc(note||'')}">
-      <button type="button" class="rm-line" title="Remove line" aria-label="Remove line">&times;</button>
-    </div>`;
+function renderBuilderRows(){
+  const container = $('#builderRows');
+  if (!container) return;
+  const rows = state.draft.rows;
+  if (!rows.length){
+    container.innerHTML = `<div class="builder-empty"><b>No AXO updates yet</b> — add your first above.</div>`;
+    return;
+  }
+  const byKey = {};
+  rows.forEach((r, idx) => { (byKey[r.section] || (byKey[r.section] = [])).push({ r, idx }); });
+  container.innerHTML = SECTIONS.filter(s => s.axo && byKey[s.key] && byKey[s.key].length).map(s => {
+    const items = byKey[s.key].map(({ r, idx }) => builderRowHtml(r, idx)).join('');
+    return `<div class="brow-group">
+        <div class="brow-group-h"><span class="n">${s.num}.</span>${esc(s.title)}<span class="brow-cnt">${byKey[s.key].length}</span></div>
+        <div class="brows">${items}</div>
+      </div>`;
+  }).join('');
 }
-function fileLineHtml(name, url, note){
-  return `<div class="line-row file-row">
-      <input type="text" class="f-name" placeholder="File name / label" value="${esc(name||'')}">
-      <input type="url" class="f-url" placeholder="Link (optional) — SharePoint/Drive URL" value="${esc(url||'')}">
-      <input type="text" class="f-note" placeholder="Note (optional)" value="${esc(note||'')}">
-      <button type="button" class="rm-line" title="Remove file reference" aria-label="Remove file reference">&times;</button>
-    </div>`;
+
+/* ---------- builder: collapsible extras ---------- */
+function renderNonAxo(){
+  const c = $('#nonAxoLines');
+  if (!c) return;
+  const arr = state.draft.nonAxo;
+  c.innerHTML = arr.length
+    ? arr.map((n, i) => `<div class="line-row nonaxo" data-idx="${i}">
+        <input type="text" class="l-note" placeholder="Non-AXO note (regression, end-to-end, tooling, environment…)" value="${esc(n.note||'')}">
+        <button type="button" class="rm-line nonaxo-rm" title="Remove line" aria-label="Remove line">&times;</button>
+      </div>`).join('')
+    : `<div class="lines-empty">No non-AXO notes yet.</div>`;
+  const cnt = $('#nonAxoCnt'); if (cnt) cnt.textContent = arr.length;
 }
-function bindRemove(node){
-  const btn = node.querySelector('.rm-line');
-  if (btn) btn.addEventListener('click', () => node.remove());
+function renderFiles(){
+  const c = $('#fileLines');
+  if (!c) return;
+  const arr = state.draft.fileRefs;
+  c.innerHTML = arr.length
+    ? arr.map((f, i) => `<div class="line-row file-row" data-idx="${i}">
+        <input type="text" class="f-name" placeholder="File name / label" value="${esc(f.name||'')}">
+        <input type="url" class="f-url" placeholder="Link (optional) — SharePoint/Drive URL" value="${esc(f.url||'')}">
+        <input type="text" class="f-note" placeholder="Note (optional)" value="${esc(f.note||'')}">
+        <button type="button" class="rm-line file-rm" title="Remove file reference" aria-label="Remove file reference">&times;</button>
+      </div>`).join('')
+    : `<div class="lines-empty">No file references yet.</div>`;
+  const cnt = $('#filesCnt'); if (cnt) cnt.textContent = arr.length;
+}
+
+/* ---------- builder: live Slack preview (shares the Copy builder) ---------- */
+function renderPreview(){
+  const pre = $('#slackPreview');
+  if (!pre) return;
+  pre.textContent = buildSlackText(buildModelFromDraft(readHeader(), state.draft));
+}
+
+/* ---------- builder: quick add ---------- */
+function addQuickRow(){
+  const axoEl = $('#qAxo'), stEl = $('#qStatus'), noteEl = $('#qNote');
+  if (!axoEl || !stEl || !noteEl) return;
+  const axo = axoEl.value.trim();
+  const status = stEl.value;
+  const note = noteEl.value.trim();
+  if (!axo && !note){ axoEl.focus(); return; }
+  state.draft.rows.push({ axo, status, note, section: sectionForStatus(status) });
+  axoEl.value = ''; noteEl.value = '';
+  renderBuilderRows();
+  renderPreview();
+  axoEl.focus();
+}
+
+/* ---------- builder: delegated events ---------- */
+function onBuilderInput(e){
+  const t = e.target; if (!t.closest) return;
+  const brow = t.closest('.brow');
+  if (brow){
+    const row = state.draft.rows[+brow.dataset.idx]; if (!row) return;
+    if (t.classList.contains('b-axo')) row.axo = t.value;
+    else if (t.classList.contains('b-note')) row.note = t.value;
+    renderPreview(); return;
+  }
+  const naRow = t.closest('#nonAxoLines .line-row');
+  if (naRow){ const n = state.draft.nonAxo[+naRow.dataset.idx]; if (n) n.note = t.value; renderPreview(); return; }
+  const fRow = t.closest('#fileLines .line-row');
+  if (fRow){
+    const f = state.draft.fileRefs[+fRow.dataset.idx]; if (!f) return;
+    if (t.classList.contains('f-name')) f.name = t.value;
+    else if (t.classList.contains('f-url')) f.url = t.value;
+    else if (t.classList.contains('f-note')) f.note = t.value;
+    renderPreview(); return;
+  }
+  if (t.id === 'fDate' || t.id === 'fQA') renderPreview();
+}
+function onBuilderChange(e){
+  const t = e.target; if (!t.closest) return;
+  if (t.id === 'fShift'){ renderPreview(); return; }
+  const brow = t.closest('.brow');
+  if (brow && t.classList.contains('b-status')){
+    const row = state.draft.rows[+brow.dataset.idx]; if (!row) return;
+    row.status = t.value;
+    row.section = sectionForStatus(t.value);
+    renderBuilderRows();
+    renderPreview();
+  }
+}
+function onBuilderClick(e){
+  const t = e.target; if (!t.closest) return;
+  if (t.id === 'qAdd'){ addQuickRow(); return; }
+  const brm = t.closest('.b-rm');
+  if (brm){ state.draft.rows.splice(+brm.closest('.brow').dataset.idx, 1); renderBuilderRows(); renderPreview(); return; }
+  if (t.id === 'addNonAxo'){ state.draft.nonAxo.push({ note:'' }); renderNonAxo(); focusLast('#nonAxoLines .l-note'); renderPreview(); return; }
+  if (t.id === 'addFile'){ state.draft.fileRefs.push({ name:'', url:'', note:'' }); renderFiles(); focusLast('#fileLines .f-name'); renderPreview(); return; }
+  const narm = t.closest('.nonaxo-rm');
+  if (narm){ state.draft.nonAxo.splice(+narm.closest('.line-row').dataset.idx, 1); renderNonAxo(); renderPreview(); return; }
+  const frm = t.closest('.file-rm');
+  if (frm){ state.draft.fileRefs.splice(+frm.closest('.line-row').dataset.idx, 1); renderFiles(); renderPreview(); return; }
+}
+function focusLast(sel){
+  const els = $$(sel);
+  const el = els[els.length - 1];
+  if (el) el.focus();
 }
 
 async function onSaveForm(ev){
   ev.preventDefault();
-  const shiftDate = $('#fDate').value;
-  const shift = $('#fShift').value;
-  const qaResource = $('#fQA').value.trim();
-  if (!shiftDate || !qaResource){ toast('Shift date and QA resource are required.', 'err'); return; }
-
-  const sections = {};
-  SECTIONS.forEach(s => {
-    const container = $(`#view-new [data-lines="${s.key}"]`);
-    const rows = [];
-    container.querySelectorAll('.line-row').forEach(r => {
-      if (s.axo){
-        const axo = r.querySelector('.l-axo').value.trim();
-        const note = r.querySelector('.l-note').value.trim();
-        const status = r.querySelector('.l-status').value;
-        if (axo || note) rows.push({ axo, note, status });
-      } else {
-        const note = r.querySelector('.l-note').value.trim();
-        if (note) rows.push({ note });
-      }
-    });
-    sections[s.key] = rows;
-  });
-
-  const fileRefs = [];
-  const fileContainer = $('#view-new [data-lines="__file"]');
-  if (fileContainer){
-    fileContainer.querySelectorAll('.line-row.file-row').forEach(r => {
-      const name = r.querySelector('.f-name').value.trim();
-      const url = r.querySelector('.f-url').value.trim();
-      const note = r.querySelector('.f-note').value.trim();
-      if (name || url || note) fileRefs.push({ name, url, note });
-    });
-  }
+  const header = readHeader();
+  if (!header.shiftDate || !header.qaResource.trim()){ toast('Date and QA Resource are required.', 'err'); return; }
 
   const editing = state.editingId ? state.endorsements.find(e => String(e.id) === String(state.editingId)) : null;
-  const model = {
-    id: editing ? editing.id : undefined,
-    shiftDate, shift, qaResource,
-    title: buildTitle({ shiftDate, shift, qaResource }),
-    sections,
-    fileRefs
-  };
+  const model = buildModelFromDraft(header, state.draft);
+  model.id = editing ? editing.id : undefined;
+  model.title = buildTitle(model);
+
+  // Remember the QA Resource and Shift so the next endorsement starts pre-filled.
+  lsSet('qaLastResource', model.qaResource);
+  lsSet('qaLastShift', model.shift);
 
   const saveBtn = $('#fSave'); saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
   try {
