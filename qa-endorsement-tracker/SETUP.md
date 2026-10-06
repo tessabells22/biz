@@ -1,8 +1,13 @@
-# QA Endorsement Tracker — SharePoint deployment
+# NPD QA Endorsement Tracker — SharePoint deployment
 
 A single, self-contained `index.html` that reads and writes one shared SharePoint
-list so the whole QA team edits one copy of the shift-endorsement log. No build
+list so the whole NPD QA team edits one copy of the shift-endorsement log. No build
 step, no dependencies, no CDNs — it runs offline from any SharePoint page.
+
+> **Branding:** the chrome is re-skinned to the real **ShipERP** look (light app
+> bar, recreated inline-SVG **ShipERP** logo with an amber underline and the
+> **NPD QA** label) and the product is named **NPD QA Endorsement Tracker**. The
+> verbatim Slack field **`QA Resource`** is unchanged. See §6.
 
 The form mirrors the real Slack **"Endorsement of Tasks"** modal field-for-field
 (see "Field structure" below). Each handover is stored as **one list item**: all of
@@ -161,28 +166,60 @@ the SharePoint list.**
 
 ## 6. Branding & colours (ShipERP palette)
 
-The UI chrome uses a ShipERP-flavoured palette, kept as a **separate channel** from
-the semantic status colours so brand blue never collides with the "In Progress"
-status blue (`#2a78d6`, left untouched). All values are CSS custom properties at the
-top of `index.html` (`:root` and the two dark blocks) — **edit them there** to
-correct the brand.
+The chrome is re-skinned to match the real **ShipERP** product look, sampled from a
+sibling ShipERP internal tool ("NPD Test File Drafter"). The brand palette is kept
+as a **separate channel** from the semantic status colours. All values are CSS
+custom properties at the top of `index.html` (`:root` and the two dark blocks) —
+**edit them there** to adjust the brand.
+
+### Logo (recreated, inline SVG)
+
+The app-bar carries a recreated **ShipERP** lockup — **no external image**, crisp at
+any size:
+
+- an **isometric cube / open-box** icon in two-tone line-art (`<svg class="logo-mark">`:
+  the `.box` body strokes in brand navy, the `.lid` in brand blue);
+- the **"ShipERP"** wordmark — `Ship` in navy, `ERP` in brand blue;
+- a short **amber underline** bar beneath the wordmark (the ShipERP accent);
+- a thin vertical divider, then the **`NPD QA`** label (small, letter-spaced, muted).
+
+### Palette — sampled from the ShipERP reference tool
 
 | Token | Role | Light | Dark |
 |---|---|---|---|
-| `--brand` | primary deep blue — app-bar band, primary buttons, focus | `#0B4F8A` | `#1766A8` |
-| `--brand-deep` | navy depth — app-bar gradient end | `#0A2E52` | `#0C1F38` |
-| `--brand-2` | teal accent — active tab underline, logo, "Total" tile, links | `#0C8A90` | `#39C0C6` |
-| `--brand-2-ink` | teal for link/active-tab text (AA) | `#0A6B70` | `#5FD0D4` |
-| `--accent` | = `--brand` (primary buttons / key tiles) | `#0B4F8A` | `#2F84C9` |
+| `--brand` | brand **navy** — icon, "Ship" wordmark, headings/badges | `#2A3B5A` | `#AFC4E4` |
+| `--brand-2` | brand **blue** — "ERP" wordmark, active tab, links, "Total" tile | `#2E6DB4` | `#6FA8E6` |
+| `--brand-2-ink` | brand blue **ink** — link / tab / pill text (AA) | `#215C9E` | `#9BC4F0` |
+| `--brand-orange` / `--accent` | ShipERP **amber** — logo underline, **primary buttons**, focus | `#F19305` | `#F5A623` |
+| `--accent-ink` | amber text accent (numbers, "+ New" tab) (AA) | `#A15F02` | `#E0962A` |
+| `--accent-fg` | **label on amber buttons** — deep warm ink | `#2A1A00` | `#2A1A00` |
+| `--pill-bg` / `--pill-fg` | info / tag pill (light-blue bg, brand-blue text) | `#DDEBF8` / `#215C9E` | `#1E3A5A` / `#9BC4F0` |
+| `--plane` | app background (light cool grey) | `#F3F5F7` | `#0F141B` |
+| `--border` | card border / hairline (≈ `#E3E8EE`) | `rgba(34,48,79,.12)` | `rgba(255,255,255,.11)` |
+| `--ok` | success / check green | `#1E8E52` | `#35B06E` |
 
-**Source of these values:** the live site (`shiperp.com`) was **not reachable from
-the build environment** (blocked by the network egress proxy), so these are a
-documented **ShipERP-inspired fallback** — a deep professional blue + navy with a
-complementary teal accent. If the real ShipERP brand hex values differ, replace the
-`--brand*` / `--accent*` tokens above in `index.html`; nothing else needs to change.
+**Source of these values:** sampled **from the ShipERP reference tool screenshot**
+(the "NPD Test File Drafter" tool), **not the live site** — the live `shiperp.com`
+was not used. Values were read off the image and refined for contrast. If the real
+ShipERP brand hex values differ, replace the `--brand*` / `--accent*` tokens in
+`index.html`; nothing else needs to change.
 
-All brand text/surface pairs were checked for **WCAG AA** (≥ 4.5:1 for normal text)
-in **both** light and dark themes. The semantic status colours (Blocked/violet,
-Failed/red, Passed/green, Needs Monitoring/amber, Urgent/orange, In Progress/blue,
-Not Tested/grey) are a reserved channel, always shown with an icon + label, never
-colour-alone.
+### Primary buttons — amber with a dark label (accessibility note)
+
+The reference's amber primary button uses **white** text, which measures ≈ **2.4:1**
+and **fails WCAG AA**. To stay on-brand *and* accessible, the amber primary buttons
+here keep the signature amber fill but use a **deep warm ink label** (`#2A1A00`),
+which measures ≈ **7:1 (light) / 8:1 (dark)** — a well-established amber-button
+pattern.
+
+### Contrast
+
+All brand **text/surface** pairs were checked for **WCAG AA** in **both** light and
+dark themes. Essential text (body, headings, links, active-tab text, pill text,
+amber-button label, muted labels) meets **≥ 4.5:1**. The amber logo underline is a
+**decorative** bar (not text). The semantic status colours are a reserved channel,
+always shown with an **icon + label**, never colour-alone, and were kept **intact
+and distinct**: *In Progress* was nudged to a cyan-azure (`#0E80C7`) so it does not
+collide with the royal brand blue, and the brand amber is kept clear of the burnt
+*Urgent/High Prio* orange. Status mapping: Blocked/violet, Failed/red, Passed/green,
+Needs Monitoring/amber, Urgent/orange, In Progress/cyan-blue, Not Tested/grey.

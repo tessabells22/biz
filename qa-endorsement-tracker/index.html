@@ -3,60 +3,72 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>QA Endorsement Tracker</title>
+<title>NPD QA Endorsement Tracker</title>
 <style>
   /* ============================================================
-     DESIGN TOKENS
-     Layout: utilitarian enterprise dashboard — brand navy app bar, a
-     surface tab strip below it, tabbed views, summary-before-detail.
+     DESIGN TOKENS — ShipERP brand (NPD QA)
+     Layout: utilitarian enterprise dashboard — a LIGHT ShipERP app bar
+     carrying the logo lockup, a surface tab strip below it, tabbed views,
+     summary-before-detail.
      Two colour channels, kept apart:
-       • BRAND chrome — ShipERP deep blue (#0B4F8A) + navy depth
-         (#0A2E52) + teal accent (#0C8A90). Used for the app bar, primary
-         buttons, active tab, links, focus.
-       • STATUS (semantic) — a separate channel carried with a label, never
-         colour-alone. In Progress stays its own blue (#2a78d6), kept
-         distinct from the ShipERP navy brand so the two never collide.
-     ShipERP hex values: the live site (shiperp.com) was unreachable from
-     this environment, so these are a documented ShipERP-inspired fallback
-     (deep professional blue + navy + teal). Correct them here if the real
-     brand values differ — see SETUP.md.
+       • BRAND chrome — sampled from the ShipERP reference tool screenshot
+         ("NPD Test File Drafter"): navy #2A3B5A (headings, "Ship" wordmark,
+         icon), brand blue #2E6DB4 (the "ERP" wordmark, links, active tab,
+         info pills), and the signature amber accent #F19305 (the logo
+         underline + primary action buttons). Primary buttons use a deep
+         warm ink label (#2A1A00) on the amber for WCAG AA — the reference's
+         white-on-amber is ~2.4:1 and fails; dark-on-amber is ~7:1.
+       • STATUS (semantic) — a separate channel carried with a label/glyph,
+         never colour-alone. Kept INTACT and distinct. In Progress is nudged
+         to a cyan-azure (#0E80C7) so it does not collide with the royal
+         brand blue; the brand amber stays clear of the burnt "Urgent" orange.
+     Hex values here were SAMPLED from the ShipERP reference tool screenshot
+     (not the live site) — see the table in SETUP.md.
      ============================================================ */
   :root{
     color-scheme: light;
-    --plane:#eef1f5;        /* app background plane (cool, brand-biased neutral) */
+    --plane:#F3F5F7;        /* app background plane (light cool grey) */
     --surface:#ffffff;      /* cards */
-    --surface-2:#f1f5f9;    /* subtle fills, table stripes, inputs */
-    --fg:#0d1b2a;
+    --surface-2:#EDF1F6;    /* subtle fills, table stripes, inputs */
+    --fg:#1F2D3D;
     --fg-2:#44566a;
-    --muted:#7a899b;
-    --grid:#e1e8ef;
+    --muted:#61707F;
+    --grid:#EAEFF4;
     --baseline:#cbd5e0;
-    --border:rgba(13,27,42,0.11);
+    --border:rgba(34,48,79,0.12);   /* ~#E3E8EE hairline */
 
-    /* ShipERP brand chrome */
-    --brand:#0B4F8A;        /* primary deep blue */
-    --brand-deep:#0A2E52;   /* navy depth for the app-bar gradient */
-    --brand-2:#0C8A90;      /* teal accent — active tab, highlights, logo */
-    --brand-2-ink:#0A6B70;  /* teal for text/links on light (AA) */
-    --brand-fg:#ffffff;     /* text on brand surfaces */
+    /* ShipERP brand chrome (sampled) */
+    --brand:#2A3B5A;        /* brand navy — icon, "Ship" wordmark, badges */
+    --brand-deep:#1E2C45;   /* navy depth */
+    --brand-2:#2E6DB4;      /* brand blue — "ERP" wordmark, active tab, links */
+    --brand-2-ink:#215C9E;  /* brand blue ink — link/pill/tab text on light (AA) */
+    --brand-fg:#ffffff;     /* text on brand (navy) surfaces */
 
-    /* accent == brand primary (primary buttons, focus, key tiles) */
-    --accent:#0B4F8A;
-    --accent-ink:#0A3E6E;
-    --accent-fg:#ffffff;
+    /* ShipERP amber accent (primary buttons, focus, accent numbers) */
+    --brand-orange:#F19305;
+    --accent:#F19305;
+    --accent-ink:#A15F02;   /* amber ink for small accent text on light (AA) */
+    --accent-fg:#2A1A00;    /* deep warm ink label ON amber buttons (AA ~7:1) */
+
+    /* info / tag pill */
+    --pill-bg:#DDEBF8;
+    --pill-fg:#215C9E;
+    /* number badge (navy, white text, both themes) */
+    --num-bg:#2A3B5A; --num-fg:#ffffff;
     --shadow:0 1px 2px rgba(13,27,42,0.06), 0 2px 8px rgba(13,27,42,0.05);
 
     /* status channel (semantic, separate from the brand) */
     --st-nottested:#6b6a65;
-    --st-inprogress:#2a78d6;
+    --st-inprogress:#0E80C7;   /* nudged to cyan-azure, distinct from brand blue */
     --st-monitoring:#9a6a00;
     --st-urgent:#c85a26;
     --st-blocked:#4a3aa7;
     --st-failed:#cc3838;
     --st-passed:#0a7d2c;
+    --ok:#1E8E52;              /* success/check green (connected pill) */
 
-    /* categorical palette for QA workload (dataviz default order) */
-    --cat-1:#2a78d6; --cat-2:#eb6834; --cat-3:#1baf7a; --cat-4:#eda100;
+    /* categorical palette for NPD QA workload (dataviz default order) */
+    --cat-1:#0E80C7; --cat-2:#eb6834; --cat-3:#1baf7a; --cat-4:#eda100;
     --cat-5:#e87ba4; --cat-6:#008300; --cat-7:#4a3aa7; --cat-8:#e34948;
 
     --radius:10px;
@@ -66,63 +78,73 @@
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       color-scheme: dark;
-      --plane:#0a0f16;
-      --surface:#141b24;
-      --surface-2:#1c2733;
-      --fg:#eef3f8;
-      --fg-2:#aebccb;
-      --muted:#7f8ea0;
-      --grid:#273340;
+      --plane:#0F141B;
+      --surface:#171E27;
+      --surface-2:#212C38;
+      --fg:#EAF0F6;
+      --fg-2:#AEBCCB;
+      --muted:#8A97A7;
+      --grid:#28333F;
       --baseline:#3a4756;
       --border:rgba(255,255,255,0.11);
-      --brand:#1766a8;
+      --brand:#AFC4E4;        /* navy lifts to light-blue on dark for the wordmark/icon */
       --brand-deep:#0c1f38;
-      --brand-2:#39c0c6;
-      --brand-2-ink:#5fd0d4;
+      --brand-2:#6FA8E6;      /* brand blue on dark */
+      --brand-2-ink:#9BC4F0;  /* link/pill/tab text on dark */
       --brand-fg:#ffffff;
-      --accent:#2f84c9;
-      --accent-ink:#8cc1ec;
-      --accent-fg:#06121f;
+      --brand-orange:#F5A623;
+      --accent:#F5A623;
+      --accent-ink:#E0962A;   /* amber accent text on dark (AA) */
+      --accent-fg:#2A1A00;    /* deep warm ink label ON amber buttons (AA ~8:1) */
+      --pill-bg:#1E3A5A;
+      --pill-fg:#9BC4F0;
+      --num-bg:#2F4660; --num-fg:#ffffff;
       --shadow:0 1px 2px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.35);
       --st-nottested:#a0a09a;
-      --st-inprogress:#3987e5;
+      --st-inprogress:#35A0E0;
       --st-monitoring:#eda100;
       --st-urgent:#ec835a;
       --st-blocked:#9085e9;
       --st-failed:#e06a6a;
       --st-passed:#2fb24f;
-      --cat-1:#3987e5; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
+      --ok:#35B06E;
+      --cat-1:#35A0E0; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
       --cat-5:#d55181; --cat-6:#2fb24f; --cat-7:#9085e9; --cat-8:#e66767;
     }
   }
   :root[data-theme="dark"]{
     color-scheme: dark;
-    --plane:#0a0f16;
-    --surface:#141b24;
-    --surface-2:#1c2733;
-    --fg:#eef3f8;
-    --fg-2:#aebccb;
-    --muted:#7f8ea0;
-    --grid:#273340;
+    --plane:#0F141B;
+    --surface:#171E27;
+    --surface-2:#212C38;
+    --fg:#EAF0F6;
+    --fg-2:#AEBCCB;
+    --muted:#8A97A7;
+    --grid:#28333F;
     --baseline:#3a4756;
     --border:rgba(255,255,255,0.11);
-    --brand:#1766a8;
+    --brand:#AFC4E4;
     --brand-deep:#0c1f38;
-    --brand-2:#39c0c6;
-    --brand-2-ink:#5fd0d4;
+    --brand-2:#6FA8E6;
+    --brand-2-ink:#9BC4F0;
     --brand-fg:#ffffff;
-    --accent:#2f84c9;
-    --accent-ink:#8cc1ec;
-    --accent-fg:#06121f;
+    --brand-orange:#F5A623;
+    --accent:#F5A623;
+    --accent-ink:#E0962A;
+    --accent-fg:#2A1A00;
+    --pill-bg:#1E3A5A;
+    --pill-fg:#9BC4F0;
+    --num-bg:#2F4660; --num-fg:#ffffff;
     --shadow:0 1px 2px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.35);
     --st-nottested:#a0a09a;
-    --st-inprogress:#3987e5;
+    --st-inprogress:#35A0E0;
     --st-monitoring:#eda100;
     --st-urgent:#ec835a;
     --st-blocked:#9085e9;
     --st-failed:#e06a6a;
     --st-passed:#2fb24f;
-    --cat-1:#3987e5; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
+    --ok:#35B06E;
+    --cat-1:#35A0E0; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
     --cat-5:#d55181; --cat-6:#2fb24f; --cat-7:#9085e9; --cat-8:#e66767;
   }
 
@@ -142,41 +164,49 @@
   a{color:var(--accent-ink)}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 
-  /* ---------- App bar (ShipERP brand band) ---------- */
+  /* ---------- App bar (ShipERP light brand surface) ---------- */
   .appbar{
     position:sticky;
     top:env(safe-area-inset-top,0px);
     z-index:40;
-    box-shadow:var(--shadow);
+    background:var(--plane);
+    border-bottom:1px solid var(--border);
   }
   .appbar-inner{
     max-width:1180px;margin:0 auto;
-    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    padding:13px 20px;
-    background:linear-gradient(100deg,var(--brand-deep),var(--brand));
-    color:var(--brand-fg);
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:12px 20px 11px;
+    color:var(--fg);
   }
-  .brand{display:flex;align-items:center;gap:11px;margin-right:auto;min-width:0}
-  .brand .mark{
-    width:36px;height:36px;border-radius:9px;flex:none;
-    background:#ffffff;
-    color:var(--brand);display:grid;place-items:center;font-weight:800;font-size:15px;
-    letter-spacing:.01em;box-shadow:0 1px 2px rgba(0,0,0,.25);
-  }
-  .brand .mark .tk{color:var(--brand-2)}
-  .brand .names{min-width:0}
-  .brand h1{font-size:16px;font-weight:650;letter-spacing:-.01em;white-space:nowrap;color:#fff}
-  .brand .sub{font-size:11.5px;color:rgba(255,255,255,0.72);white-space:nowrap}
+
+  /* ShipERP logo lockup: cube icon + "ShipERP" wordmark + amber underline
+     + divider + "NPD QA" label — recreated from the reference screenshot. */
+  .brand{display:flex;align-items:center;gap:10px;min-width:0;text-decoration:none}
+  .brand .logo-mark{width:30px;height:30px;flex:none;display:block}
+  .brand .logo-mark .box{stroke:var(--brand)}
+  .brand .logo-mark .lid{stroke:var(--brand-2)}
+  .wm{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+  .wm-txt{font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1}
+  .wm-txt .ship{color:var(--brand)}
+  .wm-txt .erp{color:var(--brand-2)}
+  .wm-underline{height:3px;width:100%;min-width:34px;border-radius:2px;background:var(--brand-orange)}
+  .brand-div{width:1px;height:24px;background:var(--border);margin:0 1px;flex:none}
+  .brand-tag{font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+
+  .apptitle{min-width:0;display:flex;flex-direction:column;gap:1px;margin-right:auto;border-left:1px solid var(--border);padding-left:14px;margin-left:2px}
+  .apptitle h1{font-size:16px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;color:var(--fg)}
+  .apptitle .sub{font-size:11.5px;color:var(--muted);white-space:nowrap}
 
   .pill-conn{
     display:inline-flex;align-items:center;gap:7px;
     font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;
-    border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.12);color:#fff;
+    border:1px solid var(--border);background:var(--surface);color:var(--fg-2);
   }
-  .pill-conn .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.7);flex:none}
-  .pill-conn.ok{color:#fff;border-color:rgba(255,255,255,0.4)}
-  .pill-conn.ok .dot{background:#5fe0a0}
-  .pill-conn.demo .dot{background:#ffcf5a}
+  .pill-conn .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+  .pill-conn.ok{color:var(--fg-2);border-color:color-mix(in srgb,var(--ok) 40%,var(--border))}
+  .pill-conn.ok .dot{background:var(--ok)}
+  .pill-conn.demo{border-color:color-mix(in srgb,var(--st-monitoring) 40%,var(--border))}
+  .pill-conn.demo .dot{background:var(--brand-orange)}
 
   .iconbtn{
     display:inline-flex;align-items:center;gap:7px;
@@ -184,16 +214,9 @@
     padding:7px 12px;border-radius:8px;font-size:13px;font-weight:550;
   }
   .iconbtn:hover{background:var(--surface-2);color:var(--fg)}
-  .iconbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
-  .iconbtn.primary:hover{filter:brightness(1.08)}
+  .iconbtn.primary{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 88%,#fff 12%),var(--accent));border-color:color-mix(in srgb,var(--accent) 70%,#000 12%);color:var(--accent-fg);font-weight:700}
+  .iconbtn.primary:hover{filter:brightness(1.05)}
   .iconbtn.square{padding:7px 10px}
-  /* header-scoped: ghost buttons that read on the navy band */
-  .appbar-inner .iconbtn{
-    background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.22);color:#fff;
-  }
-  .appbar-inner .iconbtn:hover{background:rgba(255,255,255,0.2);color:#fff}
-  .appbar-inner .iconbtn.cta{background:var(--brand-2);border-color:var(--brand-2);color:#fff}
-  .appbar-inner .iconbtn.cta:hover{filter:brightness(1.08)}
 
   /* ---------- Tabs (surface strip under the band) ---------- */
   .tabs{
@@ -350,7 +373,7 @@
   .endo-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface-2)}
   .endo-head .e-title{font-size:14.5px;font-weight:650}
   .endo-head .e-meta{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .endo-head .chip{font-size:10.5px;font-weight:650;padding:2px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--fg-2)}
+  .endo-head .chip{font-size:10.5px;font-weight:650;padding:2px 9px;border-radius:999px;background:var(--pill-bg);border:1px solid color-mix(in srgb,var(--pill-fg) 22%,transparent);color:var(--pill-fg)}
   .endo-head .e-actions{margin-left:auto;display:flex;gap:7px}
   .endo-head .e-actions button{padding:5px 10px;font-size:12px}
   .danger{color:var(--st-failed);border-color:color-mix(in srgb,var(--st-failed) 35%,var(--border))}
@@ -390,7 +413,7 @@
   .fsec-head .n{
     flex:none;display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;
     font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;
-    color:var(--brand-fg);background:var(--brand);border-radius:6px;
+    color:var(--num-fg);background:var(--num-bg);border-radius:6px;
   }
   .fsec-head .addln{margin-left:auto;flex:none}
   .fsec-head .addln button{padding:5px 10px;font-size:12px;white-space:nowrap}
@@ -459,15 +482,27 @@
 <body>
   <header class="appbar">
     <div class="appbar-inner">
-      <div class="brand">
-        <div class="mark">QA</div>
-        <div class="names">
-          <h1>QA Endorsement Tracker</h1>
-          <div class="sub">Endorsement of Tasks &middot; shared shift handover</div>
-        </div>
+      <a class="brand" href="#dashboard" aria-label="ShipERP — NPD QA">
+        <svg class="logo-mark" viewBox="0 0 32 32" width="30" height="30" role="img" aria-hidden="true"
+             fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+          <path class="box" d="M4.5 10 L4.5 22 L16 28.5 L27.5 22 L27.5 10"/>
+          <path class="box" d="M16 16.5 L16 28.5"/>
+          <path class="lid" d="M4.5 10 L16 3.5 L27.5 10 L16 16.5 Z"/>
+          <path class="lid" d="M16 3.5 L16 9"/>
+        </svg>
+        <span class="wm">
+          <span class="wm-txt"><span class="ship">Ship</span><span class="erp">ERP</span></span>
+          <span class="wm-underline"></span>
+        </span>
+        <span class="brand-div"></span>
+        <span class="brand-tag">NPD QA</span>
+      </a>
+      <div class="apptitle">
+        <h1>NPD QA Endorsement Tracker</h1>
+        <div class="sub">Endorsement of Tasks &middot; shared shift handover</div>
       </div>
       <span id="connPill" class="pill-conn"><span class="dot"></span><span id="connText">Connecting…</span></span>
-      <button class="iconbtn cta" id="copyBtn" title="Copy the latest endorsement in Slack handover format">⧉ Copy latest as Slack</button>
+      <button class="iconbtn primary" id="copyBtn" title="Copy the latest endorsement in Slack handover format">⧉ Copy latest as Slack</button>
       <button class="iconbtn square" id="refreshBtn" title="Re-fetch from the backend">⟳ Refresh</button>
       <button class="iconbtn square" id="themeBtn" title="Toggle light / dark">◐</button>
       <button class="iconbtn square" id="helpBtn" title="Setup &amp; help">?</button>
@@ -511,7 +546,7 @@
         <button class="x" id="helpX" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
-        <p>This tracker reads and writes a single SharePoint list so the whole QA team edits one shared
+        <p>This tracker reads and writes a single SharePoint list so the whole NPD QA team edits one shared
         copy. Each "Endorsement of Tasks" handover is stored as one list item; all of its sections and
         its file references are kept as JSON in one text column, so list setup stays trivial.</p>
         <h3>SharePoint list: <code>QAEndorsements</code></h3>
@@ -1152,7 +1187,7 @@ function renderDashboard(){
       </div>
       <div class="card card-pad">
         <div class="section-head" style="margin:0 0 14px">
-          <h2 style="font-size:14px">QA workload</h2>
+          <h2 style="font-size:14px">NPD QA workload</h2>
           <span class="hint">Distinct AXOs each QA most recently touched</span>
         </div>
         <div class="wl">${wlRows || '<div class="sec-empty">No data yet.</div>'}</div>
