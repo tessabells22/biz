@@ -444,8 +444,7 @@
   .form-actions .hint{font-size:12px;color:var(--muted)}
 
   /* ---------- Unified AXO row builder ---------- */
-  .builder-grid{display:grid;grid-template-columns:minmax(0,1fr) 352px;gap:18px;align-items:start}
-  @media(max-width:900px){.builder-grid{grid-template-columns:1fr}}
+  #endoForm{max-width:780px}
   .builder-main{min-width:0;display:flex;flex-direction:column;gap:14px}
 
   /* quick add control */
@@ -493,13 +492,42 @@
   .extra-body .fsec-hint{margin:0 0 2px}
   .extra-body .add-ln{align-self:flex-start}
 
-  /* live Slack preview rail */
-  .preview-rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 14px)}
-  .preview-card{padding:14px 16px}
-  .preview-h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-2);display:flex;align-items:center;gap:8px;margin-bottom:11px}
-  .preview-h .pdot{width:8px;height:8px;border-radius:50%;background:var(--brand-2);flex:none}
-  .preview-pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;color:var(--fg);max-height:58vh;overflow:auto}
-  .preview-note{font-size:11px;color:var(--muted);margin:11px 0 0;line-height:1.4}
+  /* live Slack preview */
+  .preview-h .pdot,.preview-panel > summary .pdot{width:8px;height:8px;border-radius:50%;background:var(--brand-2);flex:none}
+  .preview-pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;color:var(--fg);max-height:52vh;overflow:auto;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 12px}
+  .preview-note{font-size:11px;color:var(--muted);margin:0;line-height:1.4}
+  /* collapsible preview panel (reuses .extra chrome) */
+  .preview-panel{margin-top:2px}
+  .preview-panel > summary{color:var(--fg-2)}
+  .preview-body{gap:10px}
+
+  /* ---------- File upload (Needs Continuation Test File Upload) ---------- */
+  .filedrop{
+    display:flex;flex-direction:column;gap:3px;align-items:flex-start;
+    border:1.5px dashed var(--border);border-radius:var(--radius-sm);
+    background:var(--surface-2);padding:13px 14px;
+  }
+  .filedrop.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--surface))}
+  .filedrop .fd-main{font-size:12.8px;color:var(--fg-2)}
+  .filedrop .fd-cap{font-size:11px;color:var(--fg-2);line-height:1.4}
+  .linklike{border:0;background:transparent;color:var(--brand-2-ink);font-weight:650;padding:0;text-decoration:underline;font-size:inherit}
+  .linklike:hover{color:var(--brand-2)}
+  .file-chip{
+    display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1.3fr) 34px;gap:9px;align-items:center;
+    border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);padding:7px 9px;
+  }
+  .file-chip .fc-ic{flex:none;color:var(--brand-2-ink)}
+  .file-chip .fc-meta{min-width:0;display:flex;flex-direction:column;gap:1px}
+  .file-chip .fc-name{font-size:12.8px;font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .file-chip .fc-sub{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  @media(max-width:620px){
+    .file-chip{grid-template-columns:auto minmax(0,1fr) 40px}
+    .file-chip .fc-note{grid-column:1/4}
+  }
+
+  /* ---------- Notify-Slack toggle (sticky save bar) ---------- */
+  .notify-slack{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--fg-2);cursor:pointer}
+  .notify-slack input{width:auto;margin:0}
 
   /* ---------- Empty state ---------- */
   .empty-state{text-align:center;padding:52px 20px;color:var(--muted)}
@@ -615,7 +643,7 @@
             <tr><td><code>ShiftDate</code></td><td>Date and Time (or ISO text)</td><td>The shift date</td></tr>
             <tr><td><code>Shift</code></td><td>Choice / single line</td><td>Day &middot; Mid &middot; Night</td></tr>
             <tr><td><code>QAResource</code></td><td>Single line of text</td><td>QA who logged it</td></tr>
-            <tr><td><code>Payload</code></td><td>Multiple lines of plain text</td><td><code>JSON.stringify({sections, fileRefs})</code> — all handover sections plus the "Needs Continuation Test File Upload" references (file name, optional link, note)</td></tr>
+            <tr><td><code>Payload</code></td><td>Multiple lines of plain text</td><td><code>JSON.stringify({sections, fileRefs})</code> — all handover sections plus the "Needs Continuation Test File Upload" references (links, SharePoint attachments, or inline demo files)</td></tr>
           </tbody>
         </table>
         <h3>Connect it</h3>
@@ -642,7 +670,16 @@
    ============================================================ */
 const SP_CONFIG = {
   siteUrl: '',                 // e.g. 'https://contoso.sharepoint.com/sites/QA'
-  listName: 'QAEndorsements'
+  listName: 'QAEndorsements',
+  // OPTIONAL Slack notification. Leave empty to keep it OFF (default). When set to
+  // a Slack Incoming Webhook URL, a successful Save can post the endorsement's
+  // Slack text to that channel (see the per-save "Notify Slack" toggle and the
+  // "Post to Slack" button on each Shift Log card). WARNING: a webhook URL placed
+  // here is visible in the page source to anyone who can open the file — only use
+  // it for an internal/trusted-audience page, and note it fires only for saves
+  // made through this page. For a server-side credential that fires for ALL
+  // sources, prefer a Power Automate flow instead (see SETUP.md → Slack notifications).
+  slackWebhookUrl: ''          // e.g. 'https://hooks.slack.com/services/T000/B000/XXXX'
 };
 
 /* ============================================================
@@ -697,7 +734,7 @@ const FILE_FIELD = {
   num:5,
   title:'Needs Continuation Test File Upload',
   lead:'Needs Continuation Test File Upload',
-  hint:'Reference the file(s) the next shift should keep testing — a file name/label, an optional link, and a note.'
+  hint:'Hand off the file(s) the next shift should keep testing — drag in or choose files to upload, or paste a link. Add an optional note to each.'
 };
 
 /* Ordered render blocks for the Shift Log, form, and Slack copy: sections in
@@ -760,7 +797,14 @@ function draftFromModel(model){
   });
   const nonAxo = (Array.isArray(sections.nonAxo) ? sections.nonAxo : [])
     .map(r => ({ note: (r && r.note) || '' }));
-  const fileRefs = fileRefsOf(model).map(r => ({ name: r.name || '', url: r.url || '', note: r.note || '' }));
+  const fileRefs = fileRefsOf(model).map(r => ({
+    kind: r.kind, name: r.name || '', url: r.url || '', note: r.note || '',
+    dataUrl: r.dataUrl || '',
+    // _existing marks an attachment already on the server (Connected edit); _file
+    // is a pending browser File awaiting upload. Neither is serialized to payload.
+    _existing: r.kind === 'attachment', _file: null,
+    _size: r.kind === 'data' ? Math.round(((r.dataUrl || '').length) * 0.75) : 0
+  }));
   return { rows, nonAxo, fileRefs };
 }
 
@@ -782,9 +826,15 @@ function buildModelFromDraft(header, draft){
   sections.nonAxo = (draft.nonAxo || [])
     .map(n => ({ note: (n.note || '').trim() }))
     .filter(n => n.note);
-  const fileRefs = (draft.fileRefs || [])
-    .map(f => ({ name: (f.name || '').trim(), url: (f.url || '').trim(), note: (f.note || '').trim() }))
-    .filter(f => f.name || f.url || f.note);
+  const fileRefs = (draft.fileRefs || []).map(f => {
+    const name = (f.name || '').trim();
+    const note = (f.note || '').trim();
+    if (f.kind === 'attachment') return (name || note) ? { kind:'attachment', name, note } : null;
+    if (f.kind === 'data')       return (f.dataUrl || name || note)
+      ? { kind:'data', name, note, dataUrl: f.dataUrl || '' } : null;
+    const url = (f.url || '').trim();
+    return (name || url || note) ? { kind:'link', name, url, note } : null;
+  }).filter(Boolean);
   return {
     shiftDate: header.shiftDate || '',
     shift: header.shift || 'Day',
@@ -794,9 +844,52 @@ function buildModelFromDraft(header, draft){
   };
 }
 
-/* Normalize an endorsement's file references to [{name,url,note}]. */
+/* A file reference is one of three kinds, all stored in the same `fileRefs`
+   payload array:
+     • link       { kind:'link', name, url, note }   — paste a URL (original behavior)
+     • attachment { kind:'attachment', name, note }   — a real SharePoint list-item
+                                                        attachment (Connected mode)
+     • data       { kind:'data', name, note, dataUrl }— a base64 data: URL kept
+                                                        inline (Demo / local mode)
+   Legacy entries saved before kinds existed had no `kind` and only {name,url,note};
+   they are read as links so old items keep working. */
+function normalizeFileRef(r){
+  if (!r || typeof r !== 'object') return null;
+  const name = r.name || '';
+  const note = r.note || '';
+  if (r.kind === 'attachment') return { kind:'attachment', name, note };
+  if (r.kind === 'data')       return { kind:'data', name, note, dataUrl: r.dataUrl || '' };
+  // 'link' or legacy (no kind)
+  return { kind:'link', name, url: r.url || '', note };
+}
+
+/* Normalize an endorsement's file references, one canonical kind-tagged item each. */
 function fileRefsOf(e){
-  return Array.isArray(e && e.fileRefs) ? e.fileRefs : [];
+  return (Array.isArray(e && e.fileRefs) ? e.fileRefs : []).map(normalizeFileRef).filter(Boolean);
+}
+
+/* Avoid clobbering an attachment of the same name already on the item (or earlier
+   in the same batch): "report.har" → "report (2).har" → "report (3).har". */
+function dedupeFileName(name, used){
+  if (!used.has(name)) return name;
+  const dot = name.lastIndexOf('.');
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext  = dot > 0 ? name.slice(dot) : '';
+  let i = 2, cand;
+  do { cand = `${base} (${i})${ext}`; i++; } while (used.has(cand));
+  return cand;
+}
+
+/* Per-file size cap for Demo (local) mode, where files are stored inline as
+   base64 in localStorage. Keeps a single file from blowing the storage quota. */
+const DEMO_FILE_CAP = 1.5 * 1024 * 1024; // 1.5 MB
+
+/* Human file size for chips / cap messages. */
+function fmtSize(bytes){
+  const n = Number(bytes) || 0;
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+  return (n / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 function shiftRank(shift){
@@ -1081,6 +1174,55 @@ const SP = {
     });
     if (!res.ok) throw new Error('deleteItem ' + res.status);
     return true;
+  },
+
+  /* ---- List-item attachments (real binary uploads) ----
+     Attachments hang off an existing item, so adds happen AFTER the item is
+     saved and we know its Id. Requires the list to have Attachments enabled and
+     the user to have Contribute. */
+  async listAttachments(id){
+    const url = `${this.itemsBase()}(${id})/AttachmentFiles?$select=FileName,ServerRelativeUrl`;
+    const res = await fetch(url, {
+      method:'GET',
+      headers:{ 'Accept':'application/json;odata=nometadata' },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('listAttachments ' + res.status);
+    const data = await res.json();
+    return (data.value || []).map(a => ({ name: a.FileName, url: a.ServerRelativeUrl || '' }));
+  },
+
+  async addAttachment(id, fileName, arrayBuffer){
+    const digest = await this.getDigest();
+    const url = `${this.itemsBase()}(${id})/AttachmentFiles/add(FileName='${encodeURIComponent(fileName)}')`;
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'X-RequestDigest': digest
+      },
+      credentials:'same-origin',
+      body: arrayBuffer          // raw binary body
+    });
+    if (!res.ok) throw new Error('addAttachment ' + res.status);
+    return true;
+  },
+
+  async deleteAttachment(id, fileName){
+    const digest = await this.getDigest();
+    const url = `${this.itemsBase()}(${id})/AttachmentFiles/getByFileName('${encodeURIComponent(fileName)}')`;
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'X-RequestDigest': digest,
+        'IF-MATCH':'*',
+        'X-HTTP-Method':'DELETE'
+      },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('deleteAttachment ' + res.status);
+    return true;
   }
 };
 
@@ -1222,9 +1364,21 @@ function statusPill(key){
 }
 function fileRefLineHtml(r){
   const label = esc(r.name || r.url || 'file');
-  const nameHtml = r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${label}</a>` : label;
+  let nameHtml, tag = '';
+  if (r.kind === 'link'){
+    nameHtml = r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${label}</a>` : label;
+  } else if (r.kind === 'data' && r.dataUrl){
+    // inline base64 file (demo mode) — downloadable straight from the page
+    nameHtml = `<a href="${esc(r.dataUrl)}" download="${esc(r.name || 'file')}">${label}</a>`;
+    tag = ` <span class="lnote">(file)</span>`;
+  } else if (r.kind === 'attachment'){
+    nameHtml = label;
+    tag = ` <span class="lnote">(attachment)</span>`;
+  } else {
+    nameHtml = label;
+  }
   const noteHtml = r.note ? ` <span class="lnote">— ${esc(r.note)}</span>` : '';
-  return `<li><span class="lx lfile">📎</span><span class="ln">${nameHtml}${noteHtml}</span></li>`;
+  return `<li><span class="lx lfile">📎</span><span class="ln">${nameHtml}${tag}${noteHtml}</span></li>`;
 }
 function fmtDate(d){
   if (!d) return '';
@@ -1506,6 +1660,7 @@ function renderLog(){
             <span class="chip">QA: ${esc(e.qaResource)||'—'}</span>
           </span>
           <span class="e-actions">
+            ${slackWebhookEnabled() ? `<button class="iconbtn" data-slack="${esc(e.id)}" title="Post this endorsement to the configured Slack channel">↗ Post to Slack</button>` : ''}
             <button class="iconbtn" data-edit="${esc(e.id)}">Edit</button>
             <button class="iconbtn danger" data-del="${esc(e.id)}">Delete</button>
           </span>
@@ -1520,6 +1675,8 @@ function renderLog(){
 
   $$('#view-log [data-edit]').forEach(b => b.addEventListener('click', () => openForm(b.dataset.edit)));
   $$('#view-log [data-del]').forEach(b => b.addEventListener('click', () => doDelete(b.dataset.del)));
+  $$('#view-log [data-slack]').forEach(b => b.addEventListener('click', () =>
+    postEndorsementToSlack(state.endorsements.find(x => String(x.id) === String(b.dataset.slack)))));
 }
 
 async function doDelete(id){
@@ -1553,11 +1710,15 @@ function lsSet(key, val){ try { localStorage.setItem(key, val); } catch (e){} }
 
 function sectionByKey(key){ return SECTIONS.find(s => s.key === key) || {}; }
 
-/* Status dropdown, grouped so the routing is legible: the three results that
-   live under "Worked On" first, then the statuses that each own a section. */
+/* Status dropdown, grouped so the routing is legible: the three results logged
+   while working this shift first (all file under "Worked On"), then the statuses
+   that each hand an AXO off to its own follow-up section. Option labels are the
+   canonical status pill labels (STATUSES[].key) verbatim, so a row's dropdown and
+   its pill never diverge — only the ORDER and the optgroup HEADINGS are set here.
+   The underlying stored VALUES are unchanged. */
 const STATUS_GROUPS = [
-  { label:'Worked On during Shift',    statuses:['In Progress','Passed','Failed'] },
-  { label:'Routes to its own section', statuses:['Not Tested','Needs Monitoring','Urgent/High Prio','Blocked'] }
+  { label:'Worked on this shift', statuses:['In Progress','Passed','Failed'] },
+  { label:'Needs follow-up',      statuses:['Needs Monitoring','Not Tested','Urgent/High Prio','Blocked'] }
 ];
 function statusOptionsHtml(selected){
   return STATUS_GROUPS.map(g =>
@@ -1600,71 +1761,90 @@ function renderForm(){
         : 'Add one AXO at a time — its status files it into the right Slack section automatically.'}</span>
     </div>
     <form id="endoForm" autocomplete="off">
-      <div class="builder-grid">
-        <div class="builder-main">
-          <div class="form-head">
-            <label class="fld">Date
-              <input type="date" id="fDate" value="${esc(model.shiftDate)}" required></label>
-            <label class="fld">QA Resource
-              <input type="text" id="fQA" list="qaResourceList" value="${esc(model.qaResource)}" placeholder="Select or type a QA" required>
-              <datalist id="qaResourceList">${qaDatalist}</datalist></label>
-            <label class="fld">Shift
-              <select id="fShift">${['Day','Mid','Night'].map(s => `<option${s===model.shift?' selected':''}>${s}</option>`).join('')}</select></label>
-          </div>
-
-          <div class="qa-add card">
-            <div class="qa-add-row">
-              <input type="text" inputmode="numeric" id="qAxo" class="qa-axo" placeholder="AXO #" aria-label="AXO number">
-              <select id="qStatus" class="qa-status" aria-label="Status">${statusOptionsHtml('In Progress')}</select>
-              <input type="text" id="qNote" class="qa-note" placeholder="Note (optional)" aria-label="Note">
-              <button type="button" class="iconbtn primary" id="qAdd">+ Add</button>
-            </div>
-            <p class="qa-add-hint">Pick a status — it files the AXO under the right section automatically. Press <kbd>Enter</kbd> in the AXO or note field to add and keep going.</p>
-          </div>
-
-          <div id="builderRows"></div>
-
-          <div class="extras">
-            <details class="extra" id="extraNonAxo">
-              <summary>${esc(sectionByKey('nonAxo').title)}<span class="ex-cnt" id="nonAxoCnt">0</span></summary>
-              <div class="extra-body">
-                <div class="lines" id="nonAxoLines"></div>
-                <button type="button" class="iconbtn add-ln" id="addNonAxo">+ Add line</button>
-              </div>
-            </details>
-            <details class="extra" id="extraFiles">
-              <summary>${esc(FILE_FIELD.title)}<span class="ex-cnt" id="filesCnt">0</span></summary>
-              <div class="extra-body">
-                <p class="fsec-hint">${esc(FILE_FIELD.hint)}</p>
-                <div class="lines" id="fileLines"></div>
-                <button type="button" class="iconbtn add-ln" id="addFile">+ Add file reference</button>
-              </div>
-            </details>
-          </div>
+      <div class="builder-main">
+        <div class="form-head">
+          <label class="fld">Date
+            <input type="date" id="fDate" value="${esc(model.shiftDate)}" required></label>
+          <label class="fld">QA Resource
+            <input type="text" id="fQA" list="qaResourceList" value="${esc(model.qaResource)}" placeholder="Select or type a QA" required>
+            <datalist id="qaResourceList">${qaDatalist}</datalist></label>
+          <label class="fld">Shift
+            <select id="fShift">${['Day','Mid','Night'].map(s => `<option${s===model.shift?' selected':''}>${s}</option>`).join('')}</select></label>
         </div>
 
-        <aside class="preview-rail">
-          <div class="card preview-card">
-            <div class="preview-h"><span class="pdot"></span>Slack handover preview</div>
-            <pre class="preview-pre" id="slackPreview" aria-live="polite"></pre>
-            <p class="preview-note">Exactly what the Slack "Copy" button will produce once this is saved.</p>
+        <div class="qa-add card">
+          <div class="qa-add-row">
+            <input type="text" inputmode="numeric" id="qAxo" class="qa-axo" placeholder="AXO #" aria-label="AXO number">
+            <select id="qStatus" class="qa-status" aria-label="Status">${statusOptionsHtml('In Progress')}</select>
+            <input type="text" id="qNote" class="qa-note" placeholder="Note (optional)" aria-label="Note">
+            <button type="button" class="iconbtn primary" id="qAdd">+ Add</button>
           </div>
-        </aside>
+          <p class="qa-add-hint">Pick a status — it files the AXO under the right section automatically. Press <kbd>Enter</kbd> in the AXO or note field to add and keep going.</p>
+        </div>
+
+        <div id="builderRows"></div>
+
+        <div class="extras">
+          <details class="extra" id="extraNonAxo">
+            <summary>${esc(sectionByKey('nonAxo').title)}<span class="ex-cnt" id="nonAxoCnt">0</span></summary>
+            <div class="extra-body">
+              <div class="lines" id="nonAxoLines"></div>
+              <button type="button" class="iconbtn add-ln" id="addNonAxo">+ Add line</button>
+            </div>
+          </details>
+          <details class="extra" id="extraFiles">
+            <summary>${esc(FILE_FIELD.title)}<span class="ex-cnt" id="filesCnt">0</span></summary>
+            <div class="extra-body">
+              <p class="fsec-hint">${esc(FILE_FIELD.hint)}</p>
+              <div class="filedrop" id="fileDrop">
+                <input type="file" id="fileInput" multiple hidden>
+                <span class="fd-main">Drag files here, or <button type="button" class="linklike" id="filePick">choose files</button></span>
+                <span class="fd-cap" id="fileCap"></span>
+              </div>
+              <div class="lines" id="fileLines"></div>
+              <button type="button" class="iconbtn add-ln" id="addFile">+ Add a link instead</button>
+            </div>
+          </details>
+        </div>
+
+        <details class="extra preview-panel" id="previewPanel">
+          <summary><span class="pdot"></span>Preview Slack post</summary>
+          <div class="extra-body preview-body">
+            <pre class="preview-pre" id="slackPreview" aria-live="polite"></pre>
+            <p class="preview-note">Exactly what the Slack "Copy" button (and any Slack post) will produce once this is saved.</p>
+          </div>
+        </details>
       </div>
 
       <div class="form-actions">
         <span class="hint">Date and QA Resource are required to save; everything else is optional.</span>
+        <label class="notify-slack" id="notifySlackWrap"${slackWebhookEnabled() ? '' : ' hidden'}>
+          <input type="checkbox" id="fNotifySlack"${notifySlackPref() ? ' checked' : ''}> Notify Slack
+        </label>
         <span class="sp"></span>
         <button type="button" class="iconbtn" id="fCancel">Cancel</button>
         <button type="submit" class="iconbtn primary" id="fSave">${editing ? 'Update endorsement' : 'Save endorsement'}</button>
       </div>
     </form>`;
 
+  // Demo-mode file cap note / connected-mode attachment note on the drop zone.
+  const cap = $('#fileCap');
+  if (cap) cap.textContent = store.mode === 'sharepoint'
+    ? 'Files upload as list-item attachments on Save.'
+    : `Demo mode: files are stored in this browser (max ${fmtSize(DEMO_FILE_CAP)} each). For larger files, add a link.`;
+
   renderBuilderRows();
   renderNonAxo();
   renderFiles();
   if (state.draft.nonAxo.length){ const el = $('#extraNonAxo'); if (el) el.open = true; }
   if (state.draft.fileRefs.length){ const el = $('#extraFiles'); if (el) el.open = true; }
+
+  // Collapsible Slack preview — remembers open/closed per viewer; default collapsed.
+  const pp = $('#previewPanel');
+  if (pp){
+    pp.open = lsGet('qaPreviewOpen', '0') === '1';
+    pp.addEventListener('toggle', () => lsSet('qaPreviewOpen', pp.open ? '1' : '0'));
+  }
   renderPreview();
 
   // Delegated handlers on the freshly-built form (so they never stack across renders).
@@ -1677,6 +1857,35 @@ function renderForm(){
     const el = $('#' + id);
     if (el) el.addEventListener('keydown', ev => { if (ev.key === 'Enter'){ ev.preventDefault(); addQuickRow(); } });
   });
+
+  // Drag-and-drop onto the file zone (file picker + remove are handled via delegation).
+  const drop = $('#fileDrop');
+  if (drop){
+    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); if (ev !== 'dragleave' || e.target === drop) drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files); });
+  }
+
+  // Remember the per-save Slack toggle.
+  const ns = $('#fNotifySlack');
+  if (ns) ns.addEventListener('change', () => lsSet('qaNotifySlack', ns.checked ? '1' : '0'));
+
+  // Connected edit: list the item's real attachments and reconcile the draft.
+  if (store.mode === 'sharepoint' && editing){
+    SP.listAttachments(editing.id).then(list => {
+      const names = list.map(a => a.name);
+      const present = new Set(names);
+      // drop payload-recorded attachments no longer on the server (and not pending)
+      state.draft.fileRefs = state.draft.fileRefs.filter(f =>
+        !(f.kind === 'attachment' && !f._file && !present.has(f.name)));
+      const have = new Set(state.draft.fileRefs.filter(f => f.kind === 'attachment').map(f => f.name));
+      names.forEach(nm => { if (!have.has(nm)) state.draft.fileRefs.push({ kind:'attachment', name:nm, note:'', dataUrl:'', _existing:true, _file:null, _size:0 }); });
+      state.draft.fileRefs.forEach(f => { if (f.kind === 'attachment' && present.has(f.name)) f._existing = true; });
+      renderFiles(); renderPreview();
+      if (state.draft.fileRefs.length){ const el = $('#extraFiles'); if (el) el.open = true; }
+    }).catch(() => { /* leave payload-recorded refs as-is on error */ });
+  }
+
   $('#fCancel').addEventListener('click', () => { state.editingId = null; switchTab(editing ? 'log' : 'dashboard'); });
 }
 
@@ -1727,14 +1936,60 @@ function renderFiles(){
   if (!c) return;
   const arr = state.draft.fileRefs;
   c.innerHTML = arr.length
-    ? arr.map((f, i) => `<div class="line-row file-row" data-idx="${i}">
-        <input type="text" class="f-name" placeholder="File name / label" value="${esc(f.name||'')}">
-        <input type="url" class="f-url" placeholder="Link (optional) — SharePoint/Drive URL" value="${esc(f.url||'')}">
-        <input type="text" class="f-note" placeholder="Note (optional)" value="${esc(f.note||'')}">
-        <button type="button" class="rm-line file-rm" title="Remove file reference" aria-label="Remove file reference">&times;</button>
-      </div>`).join('')
-    : `<div class="lines-empty">No file references yet.</div>`;
+    ? arr.map((f, i) => {
+        if (f.kind === 'link'){
+          return `<div class="line-row file-row" data-idx="${i}">
+            <input type="text" class="f-name" placeholder="File name / label" value="${esc(f.name||'')}">
+            <input type="url" class="f-url" placeholder="Link — SharePoint/Drive URL" value="${esc(f.url||'')}">
+            <input type="text" class="f-note" placeholder="Note (optional)" value="${esc(f.note||'')}">
+            <button type="button" class="rm-line file-rm" title="Remove file reference" aria-label="Remove file reference">&times;</button>
+          </div>`;
+        }
+        // attachment / data → a chip showing the real file, with an optional note
+        const sizeTxt = f._size ? ` · ${fmtSize(f._size)}` : '';
+        const kindTxt = f.kind === 'attachment'
+          ? (f._existing && !f._file ? 'attachment' : 'will upload on save')
+          : 'stored in browser';
+        return `<div class="file-chip" data-idx="${i}">
+            <span class="fc-ic">📎</span>
+            <span class="fc-meta">
+              <span class="fc-name" title="${esc(f.name||'file')}">${esc(f.name||'file')}</span>
+              <span class="fc-sub">${esc(kindTxt)}${esc(sizeTxt)}</span>
+            </span>
+            <input type="text" class="f-note fc-note" placeholder="Note (optional)" value="${esc(f.note||'')}" aria-label="File note">
+            <button type="button" class="rm-line file-rm" title="Remove file" aria-label="Remove file">&times;</button>
+          </div>`;
+      }).join('')
+    : `<div class="lines-empty">No files or links yet.</div>`;
   const cnt = $('#filesCnt'); if (cnt) cnt.textContent = arr.length;
+}
+
+/* Add real files (from the picker or drag-drop) to the draft. Connected mode →
+   pending list-item attachments; Demo mode → inline base64 data (size-capped). */
+function handleFiles(fileList){
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  const ex = $('#extraFiles'); if (ex) ex.open = true;
+  files.forEach(file => {
+    if (store.mode === 'sharepoint'){
+      state.draft.fileRefs.push({ kind:'attachment', name:file.name, note:'', dataUrl:'',
+        _existing:false, _file:file, _size:file.size });
+      renderFiles(); renderPreview();
+    } else {
+      if (file.size > DEMO_FILE_CAP){
+        toast(`"${file.name}" is ${fmtSize(file.size)} — too large for demo mode (max ${fmtSize(DEMO_FILE_CAP)}). Add it as a link instead.`, 'err');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        state.draft.fileRefs.push({ kind:'data', name:file.name, note:'', dataUrl:String(reader.result),
+          _existing:false, _file:null, _size:file.size });
+        renderFiles(); renderPreview();
+      };
+      reader.onerror = () => toast(`Could not read "${file.name}".`, 'err');
+      reader.readAsDataURL(file);
+    }
+  });
 }
 
 /* ---------- builder: live Slack preview (shares the Copy builder) ---------- */
@@ -1771,7 +2026,7 @@ function onBuilderInput(e){
   }
   const naRow = t.closest('#nonAxoLines .line-row');
   if (naRow){ const n = state.draft.nonAxo[+naRow.dataset.idx]; if (n) n.note = t.value; renderPreview(); return; }
-  const fRow = t.closest('#fileLines .line-row');
+  const fRow = t.closest('#fileLines .line-row, #fileLines .file-chip');
   if (fRow){
     const f = state.draft.fileRefs[+fRow.dataset.idx]; if (!f) return;
     if (t.classList.contains('f-name')) f.name = t.value;
@@ -1784,6 +2039,7 @@ function onBuilderInput(e){
 function onBuilderChange(e){
   const t = e.target; if (!t.closest) return;
   if (t.id === 'fShift'){ renderPreview(); return; }
+  if (t.id === 'fileInput'){ handleFiles(t.files); t.value = ''; return; }
   const brow = t.closest('.brow');
   if (brow && t.classList.contains('b-status')){
     const row = state.draft.rows[+brow.dataset.idx]; if (!row) return;
@@ -1799,11 +2055,12 @@ function onBuilderClick(e){
   const brm = t.closest('.b-rm');
   if (brm){ state.draft.rows.splice(+brm.closest('.brow').dataset.idx, 1); renderBuilderRows(); renderPreview(); return; }
   if (t.id === 'addNonAxo'){ state.draft.nonAxo.push({ note:'' }); renderNonAxo(); focusLast('#nonAxoLines .l-note'); renderPreview(); return; }
-  if (t.id === 'addFile'){ state.draft.fileRefs.push({ name:'', url:'', note:'' }); renderFiles(); focusLast('#fileLines .f-name'); renderPreview(); return; }
+  if (t.id === 'filePick'){ const fi = $('#fileInput'); if (fi) fi.click(); return; }
+  if (t.id === 'addFile'){ state.draft.fileRefs.push({ kind:'link', name:'', url:'', note:'' }); renderFiles(); focusLast('#fileLines .f-name'); renderPreview(); return; }
   const narm = t.closest('.nonaxo-rm');
   if (narm){ state.draft.nonAxo.splice(+narm.closest('.line-row').dataset.idx, 1); renderNonAxo(); renderPreview(); return; }
   const frm = t.closest('.file-rm');
-  if (frm){ state.draft.fileRefs.splice(+frm.closest('.line-row').dataset.idx, 1); renderFiles(); renderPreview(); return; }
+  if (frm){ const host = frm.closest('.line-row, .file-chip'); state.draft.fileRefs.splice(+host.dataset.idx, 1); renderFiles(); renderPreview(); return; }
 }
 function focusLast(sel){
   const els = $$(sel);
@@ -1817,6 +2074,11 @@ async function onSaveForm(ev){
   if (!header.shiftDate || !header.qaResource.trim()){ toast('Date and QA Resource are required.', 'err'); return; }
 
   const editing = state.editingId ? state.endorsements.find(e => String(e.id) === String(state.editingId)) : null;
+
+  // Connected mode: settle the final (deduped) attachment names BEFORE building the
+  // payload, so the stored fileRefs match the names we actually upload.
+  if (store.mode === 'sharepoint') await assignAttachmentNames(editing, state.draft);
+
   const model = buildModelFromDraft(header, state.draft);
   model.id = editing ? editing.id : undefined;
   model.title = buildTitle(model);
@@ -1827,14 +2089,62 @@ async function onSaveForm(ev){
 
   const saveBtn = $('#fSave'); saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
   try {
-    if (editing) { await store.update(model); toast('Endorsement updated.', 'ok'); }
-    else { await store.add(model); toast('Endorsement saved.', 'ok'); }
+    let saved;
+    if (editing) { saved = await store.update(model); toast('Endorsement updated.', 'ok'); }
+    else { saved = await store.add(model); toast('Endorsement saved.', 'ok'); }
+    const savedId = (saved && saved.id != null) ? saved.id : model.id;
+
+    // Connected mode: upload pending attachments and remove any that were deleted.
+    // Upload errors surface as toasts but never undo the saved item.
+    if (store.mode === 'sharepoint') await syncAttachments(savedId, state.draft);
+
+    // Optional Slack post (off unless a webhook is configured AND the toggle is on).
+    const notify = $('#fNotifySlack');
+    if (slackWebhookEnabled() && notify && notify.checked){
+      const posted = await postToSlackWebhook(buildSlackText(model));
+      toast(posted ? 'Posted to Slack.' : 'Saved. Slack post failed.', posted ? 'ok' : 'err');
+    }
+
     state.editingId = null;
     await reload();
     switchTab('log');
   } catch (err){
     toast('Save failed: ' + err.message, 'err');
     saveBtn.disabled = false; saveBtn.textContent = editing ? 'Update endorsement' : 'Save endorsement';
+  }
+}
+
+/* Connected mode: assign final, collision-free names to pending attachment
+   uploads, deduped against the item's existing attachments and this batch. The
+   existing list is cached on the draft for syncAttachments to diff against. */
+async function assignAttachmentNames(editing, draft){
+  let existing = [];
+  if (editing){ try { existing = (await SP.listAttachments(editing.id)).map(a => a.name); } catch (e){} }
+  draft._existingAttachments = existing;
+  const kept = draft.fileRefs.filter(f => f.kind === 'attachment' && f._existing && !f._file).map(f => f.name);
+  const used = new Set([...existing, ...kept]);
+  draft.fileRefs.filter(f => f.kind === 'attachment' && f._file).forEach(f => {
+    const fn = dedupeFileName((f._file && f._file.name) || f.name || 'file', used);
+    f.name = fn; f._finalName = fn; used.add(fn);
+  });
+}
+
+/* Connected mode: upload each pending File as a list-item attachment, then delete
+   any attachment that existed before but is no longer in the draft. */
+async function syncAttachments(id, draft){
+  if (id == null) return;
+  for (const f of draft.fileRefs.filter(x => x.kind === 'attachment' && x._file)){
+    try {
+      const buf = await f._file.arrayBuffer();
+      await SP.addAttachment(id, f._finalName || f.name, buf);
+      f._file = null; f._existing = true;
+    } catch (e){ toast(`Attachment "${f.name}" failed to upload: ${e.message}`, 'err'); }
+  }
+  const kept = new Set(draft.fileRefs.filter(x => x.kind === 'attachment').map(x => x.name));
+  for (const nm of (draft._existingAttachments || [])){
+    if (!kept.has(nm)){
+      try { await SP.deleteAttachment(id, nm); } catch (e){ toast(`Could not remove attachment "${nm}": ${e.message}`, 'err'); }
+    }
   }
 }
 
@@ -1856,8 +2166,10 @@ function buildSlackText(e){
       const refs = fileRefsOf(e);
       if (!refs.length){ lines.push('• —'); }
       else refs.forEach(r => {
+        // attachments by name, links as name + url, data files by name
         const parts = [r.name || r.url || 'file'];
-        if (r.url && r.name) parts.push(r.url);
+        if (r.kind === 'link' && r.url && r.name) parts.push(r.url);
+        if (r.kind === 'attachment') parts[0] += ' (attachment)';
         if (r.note) parts.push(r.note);
         lines.push('• ' + parts.join(' — '));
       });
@@ -1893,6 +2205,50 @@ async function copyLatest(){
     catch (e2){ toast('Could not copy automatically — select and copy manually.', 'err'); }
     ta.remove();
   }
+}
+
+/* ============================================================
+   OPTIONAL SLACK WEBHOOK (off by default — nothing posts unless
+   SP_CONFIG.slackWebhookUrl is set AND the per-save toggle is on)
+   ============================================================ */
+function slackWebhookEnabled(){ return !!String(SP_CONFIG.slackWebhookUrl || '').trim(); }
+
+/* Form-encoded body for a Slack Incoming Webhook sent as a CORS "simple request"
+   (no preflight): Content-Type application/x-www-form-urlencoded, body
+   "payload=" + the JSON-encoded { text }. Pure — unit-tested. */
+function slackWebhookBody(text){
+  return 'payload=' + encodeURIComponent(JSON.stringify({ text: text || '' }));
+}
+
+/* Default state of the per-save "Notify Slack" toggle: ON when a webhook is
+   configured, unless the user turned it off (remembered in localStorage). */
+function notifySlackPref(){ return lsGet('qaNotifySlack', '1') !== '0'; }
+
+/* POST the Slack text to the configured webhook. Returns false without sending
+   when no webhook is set. Uses mode:'no-cors' so the response is opaque — a
+   thrown error means failure, otherwise we assume it was sent. Never throws. */
+async function postToSlackWebhook(text){
+  const url = String(SP_CONFIG.slackWebhookUrl || '').trim();
+  if (!url) return false;
+  try {
+    await fetch(url, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+      body: slackWebhookBody(text)
+    });
+    return true;
+  } catch (e){
+    return false;
+  }
+}
+
+/* Manual "Post to Slack" affordance for one saved endorsement. */
+async function postEndorsementToSlack(e){
+  if (!e){ toast('Nothing to post yet.', 'err'); return; }
+  if (!slackWebhookEnabled()){ toast('No Slack webhook is configured.', 'err'); return; }
+  const ok = await postToSlackWebhook(buildSlackText(e));
+  toast(ok ? 'Posted to Slack.' : 'Slack post failed.', ok ? 'ok' : 'err');
 }
 
 /* ============================================================

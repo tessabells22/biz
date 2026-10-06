@@ -30,7 +30,7 @@ Add these columns:
 | `ShiftDate` | Date and Time | The shift date. If you prefer, a **Single line of text** holding an ISO date (`YYYY-MM-DD`) also works. |
 | `Shift` | Choice *(or Single line of text)* | Choices: `Day`, `Mid`, `Night`. |
 | `QAResource` | Single line of text | The QA who logged the shift. |
-| `Payload` | Multiple lines of plain text | `JSON.stringify({ sections, fileRefs })` — all handover sections **plus** the "Needs Continuation Test File Upload" references. Set "Plain text" (not rich text / not append-only). |
+| `Payload` | Multiple lines of plain text | `JSON.stringify({ sections, fileRefs })` — all handover sections **plus** the "Needs Continuation Test File Upload" references (link / attachment / data kinds). Set "Plain text" (not rich text / not append-only). |
 
 Column **internal names must match** the names above (`ShiftDate`, `Shift`,
 `QAResource`, `Payload`). SharePoint derives the internal name from the name you
@@ -70,26 +70,56 @@ and it routes into the matching section below (status → section mapping noted 
 Every field is optional in Slack; the tool only requires **Date** and
 **QA Resource** so each item can be labelled and ordered. The builder also
 remembers the last-used QA Resource and Shift (and defaults Date to today), and
-shows a live Slack preview that matches the "Copy" output exactly. The status set is
-Not Tested / In Progress / Needs Monitoring / Urgent-High Prio / Blocked / Failed /
-Passed; *In Progress*, *Passed*, and *Failed* all live under **Worked On during
-Shift and Status**.
+has a collapsible **Preview Slack post** panel (below the row builder, remembers its
+open/closed state, default collapsed) that matches the "Copy" output exactly. The
+status dropdown is grouped **Worked on this shift** (*In Progress* default, *Passed*,
+*Failed*) and **Needs follow-up** (*Needs Monitoring*, *Not Tested*, *Urgent/High Prio*,
+*Blocked*); the stored status values are unchanged and *In Progress*, *Passed*, and
+*Failed* all still file under **Worked On during Shift and Status**.
 
 ### File references ("Needs Continuation Test File Upload")
 
-This environment is a static SharePoint-hosted page, so the field captures a **file
-reference** per entry rather than performing a binary upload: a **file name/label**,
-an **optional link** (paste the SharePoint/OneDrive/Drive URL of the file), and an
-optional **note**. Entries support add/remove for multiple files. They are stored in
-`Payload.fileRefs` and shown on the matching Shift Log card and in the Slack copy
-under the same heading.
+Each entry can hold any number of file references, added by dragging files onto the
+drop zone, by the **choose files** picker, or by **+ Add a link instead**. A removable
+chip (with name and size) shows each chosen file. Every reference is one of **three
+kinds**, all stored in the single `Payload.fileRefs` array and shown on the matching
+Shift Log card and in the Slack copy/preview under the verbatim heading:
 
-To attach the actual binary in Connected mode, upload the file to the site's
-document library (or the list item's attachments via
-`.../items(Id)/AttachmentFiles/add(FileName='..')`) and paste its URL into the link
-field. A real in-page binary upload was intentionally left out to keep the page
-dependency-free and the list schema a single text column; add it later against the
-AttachmentFiles REST endpoint if required.
+| `kind` | Stored shape | Used in | Shown as |
+|---|---|---|---|
+| `link` | `{ kind:'link', name, url, note }` | both modes | name + link + note |
+| `attachment` | `{ kind:'attachment', name, note }` | **Connected** mode | name (attachment) + note |
+| `data` | `{ kind:'data', name, note, dataUrl }` | **Demo** mode | name + note (downloadable) |
+
+Older items saved before kinds existed stored only `{ name, url, note }`; they are read
+as **links**, so nothing breaks.
+
+**Connected (SharePoint) mode — real attachments.** Dropped/picked files upload as the
+list item's **native attachments**. Because an attachment needs an existing item, Save
+happens in order: the item is created (or updated) and its `Id` read, *then* each pending
+file is uploaded with
+
+```
+POST {site}/_api/web/lists/getbytitle('QAEndorsements')/items({id})/AttachmentFiles/add(FileName='{encoded name}')
+```
+
+(the file's `ArrayBuffer` as the request body, with a fresh `X-RequestDigest`). Filename
+collisions are de-duplicated automatically (`report.har` → `report (2).har`). On **Edit**
+the item's existing attachments are listed via `.../items({id})/AttachmentFiles` and shown
+as chips; removing a chip deletes the attachment on Save via
+`.../AttachmentFiles/getByFileName('{name}')` with `X-HTTP-Method: DELETE` and `IF-MATCH: *`.
+Upload/delete errors surface as a toast and never undo the saved endorsement.
+
+> **Enable attachments on the list.** List settings → *Advanced settings* →
+> *Attachments: Enabled* (SharePoint lists allow attachments by default; confirm they
+> were not turned off). Adding or removing an attachment requires **Contribute** on the
+> list (see §4).
+
+**Demo (local) mode — inline data.** With no server, each dropped/picked file is read
+with `FileReader` as a base64 `data:` URL and stored inline (kind `data`) so it persists
+in `localStorage` and can be re-downloaded from the card. A per-file cap of **1.5 MB** is
+enforced to protect the browser storage quota; a larger file is rejected with a clear
+message suggesting the **link** option instead.
 
 ---
 
@@ -142,7 +172,8 @@ modern pages and classic:
 
 The app inherits the user's SharePoint permissions on the list:
 
-- **Contribute** (or higher) → can log new endorsements, edit, and delete.
+- **Contribute** (or higher) → can log new endorsements, edit, and delete, and
+  **add or remove list-item attachments** (the real file uploads).
 - **Read** → can view the dashboard, tracker, and shift log, but writes will fail
   with a clear error toast.
 
@@ -169,6 +200,64 @@ detected mode, so the UI behaves identically in both.
 
 The sample data (demo mode only) is a preview aid. The **source of truth is always
 the SharePoint list.**
+
+---
+
+## Slack notifications (optional)
+
+Saving an endorsement can post its Slack handover text to a Slack channel. This is
+**off by default** — nothing is posted unless you set it up. There are two routes;
+pick one.
+
+The tool always offers the existing **Copy latest as Slack** button (clipboard, no
+integration needed). The two options below *post automatically*.
+
+### 1. Recommended — Power Automate (credential stays server-side)
+
+Build a flow in Power Automate:
+
+1. Trigger: **When an item is created** → site = your site, list = **`QAEndorsements`**.
+2. (Optional) Add a **Condition** or **Compose** to format the message from the item's
+   columns / `Payload`.
+3. Action: **Post message** (Slack connector) to the target channel, *or* an **HTTP**
+   action `POST`ing to a Slack Incoming Webhook with body `{ "text": "…" }`.
+
+Why this is preferred:
+
+- The Slack credential (connection or webhook) lives in the flow, **never in the page
+  source** — nobody who opens `index.html` can read it.
+- It fires for **every** item created in the list, including items created by Power
+  Automate or any other client, not only saves made through this page.
+
+### 2. Alternative — Slack Incoming Webhook in the page
+
+Set the webhook URL near the top of `index.html`:
+
+```js
+const SP_CONFIG = {
+  …
+  slackWebhookUrl: 'https://hooks.slack.com/services/T000/B000/XXXXXXXX'
+};
+```
+
+Create the webhook in Slack via an app with **Incoming Webhooks** enabled (Slack →
+*Your apps* → *Incoming Webhooks* → *Add New Webhook to Workspace*). When
+`slackWebhookUrl` is non-empty:
+
+- Each successful Save posts the generated Slack text to that channel. The post is sent
+  as a CORS "simple request" (`Content-Type: application/x-www-form-urlencoded`, body
+  `payload=<json>`, `mode:'no-cors'`), so the browser needs no proxy. A failed post is
+  **never** allowed to fail the Save — it shows a non-blocking toast.
+- A per-save **Notify Slack** checkbox appears in the save bar (on by default when a
+  webhook is configured, remembered per browser) so a user can skip the auto-post for a
+  given entry.
+- Each Shift Log card gains a **Post to Slack** button to (re)post that endorsement on
+  demand.
+
+> **⚠️ The webhook URL is visible in the page source** to anyone who can open the file.
+> Only use this route for an **internal / trusted-audience** page. It also fires **only
+> for saves made through this page** — items created by other clients are not posted.
+> For a server-side secret that covers all sources, use route 1.
 
 ---
 
