@@ -97,7 +97,11 @@ The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT
 
 - **Data** lives in the **owner's Google Sheet**; uploaded files in the owner's Drive
   folder **"NPD QA Test Files"** (shared "anyone with link — view" so links open for
-  the team).
+  the team). Uploads go through the **Drive REST API** using the app's own OAuth token,
+  so the tool keeps only the **narrow `drive.file`** scope — no broad `drive` access and
+  no advanced service to enable. If your team prefers tighter sharing, change the
+  permission `type` from `anyone` to `domain` (Workspace org-only) in `apiUploadFile`, or
+  remove the permission step entirely so each file stays private and is shared manually.
 - **Execute as Me** means every visitor's reads/writes run under the **owner's**
   identity and quotas — the Sheet and Drive are the owner's.
 - The **Slack webhook** is in **Script Properties**, never in the page source.
@@ -123,23 +127,21 @@ The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT
 ## 8. Troubleshooting
 
 - **Uploads folder / `DRIVE_FOLDER_ID`.** The uploads folder (**"NPD QA Test Files"**)
-  is **created once** and its id is **cached in the Script Property `DRIVE_FOLDER_ID`**
-  (auto-managed — leave it unset yourself). The server resolves the folder by that id
-  with `DriveApp.getFolderById`; it **never does a Drive-wide search** for a folder by
-  name. This is deliberate: a name search (`getFoldersByName`) would require the broad
-  `drive`/`drive.readonly` scope, whereas touching an **app-created** folder by id, and
-  creating files in it, works under the **minimal `drive.file`** scope. If the cached
-  folder is deleted, the server simply creates a new one and re-caches its id on the
-  next upload. To force a brand-new folder, delete the `DRIVE_FOLDER_ID` Script
-  Property.
-- **Applying code changes.** Pulling an update from this repo does **not** change your
-  deployed copy. After any change to `Code.gs` (or `index` / the manifest), you must
-  **paste the updated file into your Apps Script editor and Save** (and, for a change
-  to take effect for users, **Deploy → Manage deployments → Edit → New version**).
-- **Re-authorization.** The Drive-folder fix above needs **no re-authorization** — the
-  requested scopes in `appsscript.json` are **unchanged** (still only Sheets,
-  `drive.file`, external requests, and ScriptApp). You only have to re-approve scopes
-  when the manifest's `oauthScopes` actually change.
+  is **created once** via the Drive REST API and its id is **cached in the Script
+  Property `DRIVE_FOLDER_ID`** (auto-managed — leave it unset yourself). The server
+  verifies that cached id with a REST `GET` and reuses it; it **never searches** for a
+  folder by name. This is deliberate: a name search would require the broad `drive`
+  scope, whereas creating and touching **app-created** items works under the **minimal
+  `drive.file`** scope. If the cached folder is deleted/trashed, the server simply
+  creates a new one and re-caches its id on the next upload. To force a brand-new
+  folder, delete the `DRIVE_FOLDER_ID` Script Property.
+- **Applying code changes + re-auth.** Pulling an update from this repo does **not**
+  change your deployed copy. After any change to `Code.gs` / `appsscript.json` (or
+  `index`), **paste the updated file(s) into your Apps Script editor and Save**, then
+  **Deploy → Manage deployments → Edit → New version**. On that first run/deploy after
+  this change, Apps Script will **prompt to (re)authorize** — **approve it**. (The
+  requested scopes are still only Sheets, `drive.file`, external requests, and
+  ScriptApp — no broad `drive` access is ever requested.)
 
 ---
 
@@ -153,10 +155,12 @@ The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT
   calling `apiList()`, `apiAdd(model)`, `apiUpdate(id, model)`, `apiRemove(id)`. The
   view code is unchanged from the SharePoint edition.
 - **File upload.** In Connected mode a chosen file is read to base64 (FileReader) and
-  sent to `apiUploadFile(name, mimeType, base64)`; the server saves it to the Drive
-  folder and returns `{ name, url }`, stored as a `kind:'link'` fileRef pointing at the
-  Drive URL (so it renders/opens like any pasted link). Demo mode keeps the inline
-  data-URL fallback with a size cap. Pasting a link also still works.
+  sent to `apiUploadFile(name, mimeType, base64)`; the server performs a **multipart
+  Drive REST v3 upload** (via `UrlFetchApp` + `ScriptApp.getOAuthToken()`, so no
+  `DriveApp` and only the `drive.file` scope), shares the file view-by-link, and returns
+  `{ name, url }`, stored as a `kind:'link'` fileRef pointing at the Drive URL (so it
+  renders/opens like any pasted link). Demo mode keeps the inline data-URL fallback with
+  a size cap. Pasting a link also still works.
 - **Slack (server-side).** `apiAdd` calls `sendNewEndorsementAlert_`, which posts
   `buildSlackAlert(model)` — the same alert content as the SharePoint edition (shift
   header, Urgent/High Prio AXOs up top, per-section counts). A failed post never fails

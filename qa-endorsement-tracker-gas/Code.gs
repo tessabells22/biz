@@ -176,50 +176,123 @@ function findRowById_(sheet, id) {
 }
 
 /* ============================================================
-   DRIVE FILE UPLOAD
-   Decode base64 → blob → save into the "NPD QA Test Files" folder,
-   share ANYONE_WITH_LINK/VIEW, return { name, url }. Collisions on
-   name are de-duplicated ("report.har" → "report (2).har").
+   DRIVE FILE UPLOAD — via the Drive REST API v3 (NOT the built-in Drive service)
+   ------------------------------------------------------------
+   Apps Script's built-in Drive service write methods (createFolder/createFile)
+   require the BROAD https://www.googleapis.com/auth/drive scope, which we
+   deliberately do NOT request. The Drive REST API, called with the script's own
+   OAuth token (ScriptApp.getOAuthToken()), honors the NARROW
+   https://www.googleapis.com/auth/drive.file scope — per-file access to the
+   files this app creates. So every Drive operation here is a plain
+   UrlFetchApp.fetch with an Authorization: Bearer header. No broad-scope service,
+   and no advanced/enabled service required.
    ============================================================ */
-function apiUploadFile(name, mimeType, base64) {
-  var folder = getUploadFolder_();
-  var safeName = dedupeFileName(name || 'file', existingNames_(folder));
-  var bytes = Utilities.base64Decode(base64 || '');
-  var blob = Utilities.newBlob(bytes, mimeType || 'application/octet-stream', safeName);
-  var file = folder.createFile(blob);
-  try {
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch (e) {
-    // Sharing may be restricted by domain policy; the file still saves. Log and continue.
-    Logger.log('setSharing failed for ' + safeName + ': ' + e);
-  }
-  return { name: safeName, url: file.getUrl() };
+
+/* Shared bearer header for Drive REST calls. */
+function driveAuthHeader_() {
+  return { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() };
 }
 
 /* Get-or-create the uploads folder, remembering its id in Script Properties.
-   NEVER does a Drive-wide search (getFoldersByName requires the broad
-   drive/drive.readonly scope). Under the minimal drive.file scope we may only
-   touch app-created items by id, so we cache the folder id and resolve it with
-   getFolderById; if that is missing/stale we create a fresh folder and re-cache. */
-function getUploadFolder_() {
+   NEVER does a name search (that needs the broad drive scope). Under drive.file
+   we verify/reuse the cached id, else create a fresh app-owned folder and cache
+   its id. */
+function getOrCreateUploadFolderId_() {
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty('DRIVE_FOLDER_ID');
   if (id) {
-    // getFolderById on an app-created folder is allowed under drive.file.
-    try { return DriveApp.getFolderById(id); } catch (e) { /* deleted/stale id — recreate below */ }
+    try {
+      var verify = UrlFetchApp.fetch(
+        'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) +
+          '?fields=id,trashed&supportsAllDrives=true',
+        { method: 'get', headers: driveAuthHeader_(), muteHttpExceptions: true });
+      if (verify.getResponseCode() === 200) {
+        var info = JSON.parse(verify.getContentText() || '{}');
+        if (info && info.id && !info.trashed) return info.id; // reuse the cached folder
+      }
+    } catch (e) {
+      // fall through and create a fresh folder
+    }
   }
-  // createFolder on an app-created item is allowed under drive.file.
-  var folder = DriveApp.createFolder(DRIVE_FOLDER_NAME);
-  props.setProperty('DRIVE_FOLDER_ID', folder.getId());
-  return folder;
+  var createRes = UrlFetchApp.fetch(
+    'https://www.googleapis.com/drive/v3/files?fields=id',
+    {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }),
+      headers: driveAuthHeader_(),
+      muteHttpExceptions: true
+    });
+  if (createRes.getResponseCode() < 200 || createRes.getResponseCode() >= 300) {
+    throw new Error('Could not create Drive folder (HTTP ' + createRes.getResponseCode() + '): ' + createRes.getContentText());
+  }
+  var folder = JSON.parse(createRes.getContentText() || '{}');
+  if (!folder.id) throw new Error('Drive folder create returned no id: ' + createRes.getContentText());
+  props.setProperty('DRIVE_FOLDER_ID', folder.id);
+  return folder.id;
 }
 
-/* Set of file names already in a folder (for collision de-duplication). */
-function existingNames_(folder) {
-  var used = Object.create(null);
-  var files = folder.getFiles();
-  while (files.hasNext()) { used[files.next().getName()] = true; }
-  return { has: function (n) { return !!used[n]; } };
+/* Upload one file (base64) into the uploads folder via a multipart Drive REST
+   call, make it viewable by link, and return { name, url }. Throws a clean Error
+   on a hard upload failure (the client surfaces it as a toast without losing the
+   endorsement). */
+function apiUploadFile(name, mimeType, base64) {
+  name = name || 'file';
+  mimeType = mimeType || 'application/octet-stream';
+  base64 = base64 || '';
+  var folderId = getOrCreateUploadFolderId_();
+
+  // multipart/related upload — base64 content-transfer-encoding avoids any binary
+  // concatenation in the request body.
+  var boundary = '-------npdqa' + Date.now();
+  var meta = { name: name, mimeType: mimeType, parents: [folderId] };
+  var body =
+    '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' +
+    JSON.stringify(meta) +
+    '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType +
+    '\r\nContent-Transfer-Encoding: base64\r\n\r\n' +
+    base64 +
+    '\r\n--' + boundary + '--';
+
+  var uploadRes = UrlFetchApp.fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name',
+    {
+      method: 'post',
+      contentType: 'multipart/related; boundary=' + boundary,
+      payload: body,
+      headers: driveAuthHeader_(),
+      muteHttpExceptions: true
+    });
+  if (uploadRes.getResponseCode() < 200 || uploadRes.getResponseCode() >= 300) {
+    throw new Error('Upload failed (HTTP ' + uploadRes.getResponseCode() + '): ' + uploadRes.getContentText());
+  }
+  var result = JSON.parse(uploadRes.getContentText() || '{}');
+  var fileId = result.id;
+  if (!fileId) throw new Error('Upload returned no file id: ' + uploadRes.getContentText());
+
+  // Share view-by-link. If this fails (e.g. domain policy), don't fail the whole
+  // upload — the owner can still share manually. Log and continue.
+  try {
+    var permRes = UrlFetchApp.fetch(
+      'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '/permissions',
+      {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({ role: 'reader', type: 'anyone' }),
+        headers: driveAuthHeader_(),
+        muteHttpExceptions: true
+      });
+    if (permRes.getResponseCode() < 200 || permRes.getResponseCode() >= 300) {
+      Logger.log('permissions set failed for ' + name + ' (HTTP ' + permRes.getResponseCode() + '): ' + permRes.getContentText());
+    }
+  } catch (e) {
+    Logger.log('permissions set threw for ' + name + ': ' + e);
+  }
+
+  return {
+    name: result.name || name,
+    url: result.webViewLink || ('https://drive.google.com/file/d/' + fileId + '/view')
+  };
 }
 
 /* ============================================================
@@ -509,15 +582,4 @@ function buildSlackAlert(model, opts){
     'Files ' + c.files
   ].join(' · ') + '_');
   return lines.join('\n').trim();
-}
-
-/* De-duplicate a file name against a used-set ("report.har" → "report (2).har"). */
-function dedupeFileName(name, used){
-  if (!used.has(name)) return name;
-  var dot = name.lastIndexOf('.');
-  var base = dot > 0 ? name.slice(0, dot) : name;
-  var ext  = dot > 0 ? name.slice(dot) : '';
-  var i = 2, cand;
-  do { cand = base + ' (' + i + ')' + ext; i++; } while (used.has(cand));
-  return cand;
 }
