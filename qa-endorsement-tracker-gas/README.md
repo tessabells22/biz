@@ -135,6 +135,23 @@ The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT
   `drive.file`** scope. If the cached folder is deleted/trashed, the server simply
   creates a new one and re-caches its id on the next upload. To force a brand-new
   folder, delete the `DRIVE_FOLDER_ID` Script Property.
+- **Teammates see demo mode / "Can't connect".** If a teammate opens the Web App URL
+  but the page can't reach the server, it now shows an explicit **"Can't reach the
+  tracker"** screen (a **Disconnected** pill, reload + guidance) instead of silently
+  dropping into **Demo (local)** mode — so nobody edits throwaway local data thinking
+  it's shared. Common causes and fixes:
+  - **Third-party cookies blocked.** Apps Script serves the page from a
+    `googleusercontent.com` iframe and needs cookies for `google.com` +
+    `googleusercontent.com`. **Allow third-party cookies** for those domains (or
+    disable the "block third-party cookies" setting for this site).
+  - **Multiple Google accounts.** Being signed in to several accounts can misroute the
+    request. **Use one account**, or open the link in an **incognito/private window**
+    signed in to just the right account.
+  - **Not the `/exec` URL.** Make sure the link is the deployed Web App URL (ends in
+    **`/exec`**), not a saved copy of the HTML file or a `/dev` link.
+  After fixing, click **Reload** on that screen (it re-runs detection). Genuinely local
+  previews (opening the file directly, or adding **`?demo=1`**) still get real demo mode;
+  the "Can't reach the tracker" screen also offers an **"Open demo mode instead"** link.
 - **Applying code changes + re-auth.** Pulling an update from this repo does **not**
   change your deployed copy. After any change to `Code.gs` / `appsscript.json` (or
   `index`), **paste the updated file(s) into your Apps Script editor and Save**, then
@@ -147,9 +164,16 @@ The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT
 
 ## How it works
 
-- **Runtime detection (`index.html`).** If `google.script.run` exists → **Connected —
-  Google** mode (all CRUD via the server). Otherwise → **Demo (local)** mode with
-  sample data in `localStorage`, so the page still previews when opened directly.
+- **Runtime detection (`index.html`).** On load the page **polls for the
+  `google.script.run` bridge for up to ~5 s** (it can initialize late). If it appears →
+  **Connected — Google** mode (all CRUD via the server). A **genuine local/static
+  preview** (a `file:` origin, or an explicit `?demo=1` / "Open demo mode instead"
+  request) → **Demo (local)** mode with sample data in `localStorage`. But if the page
+  is clearly **running as the Web App** yet the bridge never connects (or the first
+  `apiList()` fails) — typically third-party cookies blocked or a multi-account misroute
+  — it shows an explicit **"Can't reach the tracker"** screen with a **Disconnected**
+  pill instead of silently seeding demo data (see `store.detect()` / `isGenuineLocal()` /
+  `isWebAppContext()`).
 - **Data layer.** The `store.list / add / update / remove` interface wraps
   `google.script.run` calls in Promises (`withSuccessHandler` / `withFailureHandler`),
   calling `apiList()`, `apiAdd(model)`, `apiUpdate(id, model)`, `apiRemove(id)`. The

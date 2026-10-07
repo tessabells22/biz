@@ -207,6 +207,8 @@
   .pill-conn.ok .dot{background:var(--ok)}
   .pill-conn.demo{border-color:color-mix(in srgb,var(--st-monitoring) 40%,var(--border))}
   .pill-conn.demo .dot{background:var(--brand-orange)}
+  .pill-conn.err{color:var(--fg-2);border-color:color-mix(in srgb,var(--st-failed) 45%,var(--border))}
+  .pill-conn.err .dot{background:var(--st-failed)}
 
   .iconbtn{
     display:inline-flex;align-items:center;gap:7px;
@@ -265,6 +267,42 @@
   .banner-inner .b-txt b{color:var(--fg)}
   .banner-inner .b-x{margin-left:auto;flex:none;border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;padding:2px 6px;border-radius:6px}
   .banner-inner .b-x:hover{background:var(--surface-2);color:var(--fg)}
+
+  /* ---------- Can't-connect (disconnected) state ---------- */
+  .err-state{display:flex;justify-content:center;padding:24px 0 8px}
+  .err-card{max-width:560px;width:100%;padding:26px 28px 22px;text-align:left}
+  .err-card .err-ic{
+    width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    font-size:22px;line-height:1;margin-bottom:14px;
+    background:color-mix(in srgb,var(--st-failed) 14%,var(--surface));
+    border:1px solid color-mix(in srgb,var(--st-failed) 38%,var(--border));
+    color:var(--st-failed);
+  }
+  .err-card h2{font-size:19px;font-weight:700;letter-spacing:-.01em;color:var(--fg);margin:0 0 8px}
+  .err-card .err-lead{font-size:13.5px;line-height:1.55;color:var(--fg-2);margin:0 0 16px}
+  .err-card .err-tips{list-style:none;margin:0 0 20px;padding:0;display:flex;flex-direction:column;gap:9px}
+  .err-card .err-tips li{
+    position:relative;padding-left:22px;font-size:13px;line-height:1.5;color:var(--fg-2);
+  }
+  .err-card .err-tips li::before{
+    content:"";position:absolute;left:4px;top:7px;width:6px;height:6px;border-radius:50%;
+    background:var(--brand-2);
+  }
+  .err-card .err-tips b{color:var(--fg);font-weight:650}
+  .err-card .err-tips code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+    background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--fg);
+  }
+  .err-card .err-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+  .err-card .err-demo-link{
+    border:0;background:transparent;color:var(--brand-2-ink);font-size:12.8px;font-weight:600;
+    padding:4px 2px;text-decoration:underline;text-underline-offset:2px;cursor:pointer;
+  }
+  .err-card .err-demo-link:hover{color:var(--fg)}
+  .err-card .err-foot{
+    font-size:11.8px;line-height:1.5;color:var(--muted);margin:0;
+    border-top:1px solid var(--border);padding-top:12px;
+  }
 
   /* ---------- Stat tiles ---------- */
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:12px}
@@ -665,6 +703,7 @@
     <section class="view" id="view-tracker" hidden></section>
     <section class="view" id="view-log" hidden></section>
     <section class="view" id="view-new" hidden></section>
+    <section class="view" id="view-error" hidden></section>
   </main>
 
   <div class="toasts" id="toasts"></div>
@@ -725,9 +764,18 @@
        never in this page source. Edits do not post.
      • Reminders    → SERVER-SIDE native time triggers remind the
        team of open Urgent/High Prio AXOs at each shift start.
-   Opened OUTSIDE Apps Script (no google.script.run), the page
-   falls back to a clearly-labelled local DEMO mode with sample
-   data in localStorage, so it still previews anywhere.
+   Opened as a GENUINE local/static preview (file: origin, or an
+   explicit ?demo=1 / "Open demo mode instead" request), the page
+   uses a clearly-labelled local DEMO mode with sample data in
+   localStorage, so it still previews anywhere.
+   When the page IS the deployed Web App but the google.script.run
+   bridge fails to initialize (third-party cookies blocked, a
+   multi-account misroute, or a transient load), we DO NOT silently
+   drop to demo — that would let teammates edit throwaway local data
+   thinking it is shared. Instead we poll for the bridge for a few
+   seconds and, if it still can't connect while clearly running as
+   the Web App, show an explicit "Can't reach the tracker" state.
+   See store.detect() / isGenuineLocal() / isWebAppContext() below.
    All server config is documented in README.md next to this file.
    ============================================================ */
 
@@ -1223,6 +1271,62 @@ function hasGasBridge(){
   catch (e){ return false; }
 }
 
+/* Poll for the google.script.run bridge for up to `timeoutMs` (it can take a
+   moment to initialize inside HtmlService, especially with third-party cookies
+   or a multi-account state). Resolves true as soon as it appears, false on
+   timeout. Used so a slow/late bridge is not mistaken for "no bridge". */
+function waitForBridge(timeoutMs, intervalMs){
+  timeoutMs = timeoutMs == null ? 5000 : timeoutMs;
+  intervalMs = intervalMs == null ? 200 : intervalMs;
+  return new Promise(resolve => {
+    if (hasGasBridge()) return resolve(true);
+    const start = Date.now();
+    (function poll(){
+      if (hasGasBridge()) return resolve(true);
+      if (Date.now() - start >= timeoutMs) return resolve(false);
+      setTimeout(poll, intervalMs);
+    })();
+  });
+}
+
+/* True when an explicit DEMO request is in effect: ?demo=1 in the URL, or the
+   flag persisted when a user clicks "Open demo mode instead". */
+function demoFlagSet(){
+  try {
+    const q = new URLSearchParams(location.search || '');
+    if (q.get('demo') === '1') return true;
+  } catch (e){}
+  try { return localStorage.getItem('qaDemoMode') === '1'; } catch (e){ return false; }
+}
+function setDemoFlag(){
+  try { localStorage.setItem('qaDemoMode', '1'); } catch (e){}
+}
+
+/* CONTEXT DETECTION — distinguish "genuinely opened as a static/local file"
+   (where demo mode is the correct behavior) from "running as the Web App but
+   the server bridge isn't reachable" (where we must show an error, NOT demo).
+   The page is sandboxed inside an HtmlService iframe, so we can't read the
+   parent URL; we rely on reliable in-frame signals instead. */
+
+/* Genuine local/static preview → demo is appropriate. */
+function isGenuineLocal(){
+  if (location.protocol === 'file:') return true;   // opened as a bare file
+  if (demoFlagSet()) return true;                   // explicit demo request
+  return false;
+}
+
+/* Web-app context → a connection failure should surface an error, not demo.
+   Treat as web-app context if `window.google.script` exists at all (it is
+   injected by HtmlService even if `google.script.run` is momentarily missing),
+   OR the document is on a non-file: origin and demo was not explicitly asked
+   for. We deliberately favor NOT silently demoing when uncertain in a hosted
+   context, since a wrong demo fallback lets teammates edit throwaway data. */
+function isWebAppContext(){
+  try { if (window.google && window.google.script) return true; } catch (e){}
+  if (isGenuineLocal()) return false;
+  return true; // hosted (not file:), not an explicit demo → assume the Web App
+}
+
 /* Promise wrapper around a single google.script.run server call. */
 function gasCall(fnName){
   const args = Array.prototype.slice.call(arguments, 1);
@@ -1267,26 +1371,57 @@ function lsWrite(list){
 }
 
 const store = {
-  mode: 'demo', // 'gas' | 'demo'
+  mode: 'demo', // 'gas' | 'demo' | 'error'
+  lastError: null,
 
-  async detect(){
-    if (hasGasBridge()){
-      try {
-        const items = await GAS.list();
-        this.mode = 'gas';
-        return Array.isArray(items) ? items : [];
-      } catch (e) {
-        this.mode = 'demo';
-        toast('Could not reach the Apps Script backend — showing demo data. ' + e.message, 'err');
-      }
-    }
+  /* Seed + enter genuine demo mode (sample data in localStorage). */
+  _enterDemo(){
     this.mode = 'demo';
+    this.lastError = null;
     let list = lsRead();
     if (!list){
       list = SEED_ENDORSEMENTS.map(e => JSON.parse(JSON.stringify(e)));
       lsWrite(list);
     }
     return list;
+  },
+
+  async detect(){
+    // 1. Genuine local/static preview (file: origin or explicit ?demo=1 /
+    //    "Open demo mode instead") → demo is correct; don't wait for a bridge
+    //    that cannot exist.
+    if (isGenuineLocal()) return this._enterDemo();
+
+    // 2. Otherwise wait/retry for the google.script.run bridge (~5s) before
+    //    concluding it's unavailable — a late/slow bridge is NOT "no bridge".
+    const ready = await waitForBridge(5000, 200);
+    if (ready){
+      try {
+        const items = await GAS.list();
+        this.mode = 'gas';
+        this.lastError = null;
+        return Array.isArray(items) ? items : [];
+      } catch (e) {
+        // Bridge present but the FIRST call failed → this IS the Web App and the
+        // server can't be reached. Surface a Can't-connect state; do NOT demo.
+        this.mode = 'error';
+        this.lastError = e;
+        toast('Couldn’t reach the tracker server. ' + ((e && e.message) || ''), 'err');
+        return [];
+      }
+    }
+
+    // 3. Bridge never appeared. If we're clearly running as the Web App, show
+    //    the Can't-connect state rather than silently dropping to demo.
+    if (isWebAppContext()){
+      this.mode = 'error';
+      this.lastError = new Error('The Apps Script server bridge did not initialize.');
+      return [];
+    }
+
+    // 4. Fallback (shouldn't normally reach here, since non-local hosted pages
+    //    are web-app context) → treat as genuine demo.
+    return this._enterDemo();
   },
 
   async list(){
@@ -1416,10 +1551,14 @@ function toast(msg, kind){
 /* ---------- Connection pill ---------- */
 function renderConn(){
   const pill = $('#connPill'), txt = $('#connText');
-  pill.classList.remove('ok','demo');
+  pill.classList.remove('ok','demo','err');
   if (store.mode === 'gas'){
     pill.classList.add('ok');
     txt.textContent = 'Connected — Google';
+    $('#demoBanner').hidden = true;
+  } else if (store.mode === 'error'){
+    pill.classList.add('err');
+    txt.textContent = 'Disconnected';
     $('#demoBanner').hidden = true;
   } else {
     pill.classList.add('demo');
@@ -1428,6 +1567,66 @@ function renderConn(){
   }
 }
 let bannerDismissed = false;
+
+/* ---------- Can't-connect (disconnected) blocking state ---------- */
+/* Shown when the page is running as the Web App but the server bridge can't be
+   reached. Replaces the main content with branded guidance + a Reload button
+   and a clearly-labelled "Open demo mode instead" escape hatch. Never seeds
+   demo data on its own. */
+function renderErrorState(){
+  $$('.view').forEach(v => { if (v.id !== 'view-error') v.hidden = true; });
+  $('#demoBanner').hidden = true;
+  const el = $('#view-error');
+  el.hidden = false;
+  el.innerHTML = `
+    <div class="err-state">
+      <div class="err-card card">
+        <div class="err-ic" aria-hidden="true">⚠</div>
+        <h2>Can't reach the tracker</h2>
+        <p class="err-lead">The tracker server (Google Apps Script) didn't respond, so your
+        changes can't be saved or shared right now. This is almost always a sign-in or cookie
+        issue in the browser — your team's data is safe.</p>
+        <ul class="err-tips">
+          <li><b>Reload the page</b> — the connection often recovers on a second try.</li>
+          <li>Make sure you're signed in to the <b>correct Google account</b>. If you use
+          several, open the link in an <b>incognito / private window</b> signed in to just that account.</li>
+          <li>Allow <b>third-party cookies</b> for <code>google.com</code> and
+          <code>googleusercontent.com</code>.</li>
+          <li>Confirm you opened the deployed <b>Web App link</b> (its URL ends in
+          <code>/exec</code>), not a saved copy of this file.</li>
+        </ul>
+        <div class="err-actions">
+          <button class="iconbtn primary" id="errReloadBtn" type="button">⟳ Reload</button>
+          <button class="err-demo-link" id="errDemoBtn" type="button">Open demo mode instead</button>
+        </div>
+        <p class="err-foot">Demo mode uses throwaway sample data saved only in this browser —
+        fine for a local preview, but changes won't be shared with your team.</p>
+      </div>
+    </div>`;
+  const rb = $('#errReloadBtn'); if (rb) rb.addEventListener('click', retryConnection);
+  const db = $('#errDemoBtn'); if (db) db.addEventListener('click', enterDemoFromError);
+}
+
+/* Reload button → re-run detection (re-polls for the bridge). */
+async function retryConnection(){
+  const rb = $('#errReloadBtn'); if (rb){ rb.disabled = true; rb.textContent = '⟳ Reconnecting…'; }
+  state.endorsements = await store.detect();
+  if (store.mode === 'error'){ renderConn(); renderErrorState(); return; }
+  recompute();
+  $('#view-error').hidden = true;
+  renderConn();
+  switchTab(state.activeTab);
+}
+
+/* "Open demo mode instead" → set the demo flag and enter genuine demo mode. */
+async function enterDemoFromError(){
+  setDemoFlag();
+  state.endorsements = await store.detect(); // isGenuineLocal() now true → seeds demo
+  recompute();
+  $('#view-error').hidden = true;
+  renderConn();
+  switchTab(state.activeTab);
+}
 
 /* ============================================================
    DASHBOARD
@@ -2411,8 +2610,15 @@ function wire(){
   $('#refreshBtn').addEventListener('click', async () => {
     $('#refreshBtn').disabled = true;
     const items = await store.detect().catch(() => null);
+    if (store.mode === 'error'){
+      renderConn();
+      renderErrorState();
+      $('#refreshBtn').disabled = false;
+      return;
+    }
     if (items) { state.endorsements = items; recompute(); }
     else await reload();
+    $('#view-error').hidden = true;
     renderConn();
     renderAll();
     $('#refreshBtn').disabled = false;
@@ -2434,6 +2640,11 @@ async function boot(){
   const h = (location.hash || '').slice(1);
   if (['dashboard','tracker','log','new'].includes(h)) state.activeTab = h;
   state.endorsements = await store.detect();
+  if (store.mode === 'error'){
+    renderConn();
+    renderErrorState();
+    return;
+  }
   recompute();
   renderConn();
   switchTab(state.activeTab);
