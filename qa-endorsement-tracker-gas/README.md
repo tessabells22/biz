@@ -120,6 +120,27 @@ The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT
 - The **seeded sample rows appear only in demo mode** (when the page is opened outside
   Apps Script). The real Sheet **starts empty**.
 
+## 8. Troubleshooting
+
+- **Uploads folder / `DRIVE_FOLDER_ID`.** The uploads folder (**"NPD QA Test Files"**)
+  is **created once** and its id is **cached in the Script Property `DRIVE_FOLDER_ID`**
+  (auto-managed — leave it unset yourself). The server resolves the folder by that id
+  with `DriveApp.getFolderById`; it **never does a Drive-wide search** for a folder by
+  name. This is deliberate: a name search (`getFoldersByName`) would require the broad
+  `drive`/`drive.readonly` scope, whereas touching an **app-created** folder by id, and
+  creating files in it, works under the **minimal `drive.file`** scope. If the cached
+  folder is deleted, the server simply creates a new one and re-caches its id on the
+  next upload. To force a brand-new folder, delete the `DRIVE_FOLDER_ID` Script
+  Property.
+- **Applying code changes.** Pulling an update from this repo does **not** change your
+  deployed copy. After any change to `Code.gs` (or `index` / the manifest), you must
+  **paste the updated file into your Apps Script editor and Save** (and, for a change
+  to take effect for users, **Deploy → Manage deployments → Edit → New version**).
+- **Re-authorization.** The Drive-folder fix above needs **no re-authorization** — the
+  requested scopes in `appsscript.json` are **unchanged** (still only Sheets,
+  `drive.file`, external requests, and ScriptApp). You only have to re-approve scopes
+  when the manifest's `oauthScopes` actually change.
+
 ---
 
 ## How it works

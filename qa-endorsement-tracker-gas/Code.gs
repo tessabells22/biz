@@ -196,16 +196,20 @@ function apiUploadFile(name, mimeType, base64) {
   return { name: safeName, url: file.getUrl() };
 }
 
-/* Get-or-create the uploads folder, remembering its id in Script Properties. */
+/* Get-or-create the uploads folder, remembering its id in Script Properties.
+   NEVER does a Drive-wide search (getFoldersByName requires the broad
+   drive/drive.readonly scope). Under the minimal drive.file scope we may only
+   touch app-created items by id, so we cache the folder id and resolve it with
+   getFolderById; if that is missing/stale we create a fresh folder and re-cache. */
 function getUploadFolder_() {
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty('DRIVE_FOLDER_ID');
   if (id) {
-    try { return DriveApp.getFolderById(id); } catch (e) { /* stale id — fall through */ }
+    // getFolderById on an app-created folder is allowed under drive.file.
+    try { return DriveApp.getFolderById(id); } catch (e) { /* deleted/stale id — recreate below */ }
   }
-  // Reuse an existing same-named folder if present, else create one.
-  var it = DriveApp.getFoldersByName(DRIVE_FOLDER_NAME);
-  var folder = it.hasNext() ? it.next() : DriveApp.createFolder(DRIVE_FOLDER_NAME);
+  // createFolder on an app-created item is allowed under drive.file.
+  var folder = DriveApp.createFolder(DRIVE_FOLDER_NAME);
   props.setProperty('DRIVE_FOLDER_ID', folder.getId());
   return folder;
 }
