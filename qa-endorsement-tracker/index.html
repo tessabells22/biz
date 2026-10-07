@@ -282,8 +282,8 @@
   .dash-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px;align-items:start}
   @media(max-width:860px){.dash-grid{grid-template-columns:1fr}}
 
-  .attn-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-  @media(max-width:720px){.attn-cols{grid-template-columns:1fr}}
+  .attn-cols{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  @media(max-width:520px){.attn-cols{grid-template-columns:1fr}}
   .attn{display:flex;flex-direction:column}
   .attn h3{font-size:12.5px;font-weight:650;letter-spacing:.01em;display:flex;align-items:center;gap:8px;margin-bottom:10px}
   .attn h3 .cnt{margin-left:auto;font-size:11px;font-weight:700;color:var(--surface);background:var(--ac,var(--muted));padding:1px 8px;border-radius:999px;min-width:20px;text-align:center}
@@ -525,10 +525,6 @@
     .file-chip .fc-note{grid-column:1/4}
   }
 
-  /* ---------- Notify-Slack toggle (sticky save bar) ---------- */
-  .notify-slack{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--fg-2);cursor:pointer}
-  .notify-slack input{width:auto;margin:0}
-
   /* ---------- Empty state ---------- */
   .empty-state{text-align:center;padding:52px 20px;color:var(--muted)}
   .empty-state .es-ic{font-size:34px;opacity:.5}
@@ -671,15 +667,24 @@
 const SP_CONFIG = {
   siteUrl: '',                 // e.g. 'https://contoso.sharepoint.com/sites/QA'
   listName: 'QAEndorsements',
-  // OPTIONAL Slack notification. Leave empty to keep it OFF (default). When set to
-  // a Slack Incoming Webhook URL, a successful Save can post the endorsement's
-  // Slack text to that channel (see the per-save "Notify Slack" toggle and the
-  // "Post to Slack" button on each Shift Log card). WARNING: a webhook URL placed
-  // here is visible in the page source to anyone who can open the file — only use
-  // it for an internal/trusted-audience page, and note it fires only for saves
-  // made through this page. For a server-side credential that fires for ALL
-  // sources, prefer a Power Automate flow instead (see SETUP.md → Slack notifications).
-  slackWebhookUrl: ''          // e.g. 'https://hooks.slack.com/services/T000/B000/XXXX'
+  // OPTIONAL Slack notification. Leave empty to keep it OFF (default). When set to a
+  // Slack Incoming Webhook URL, saving a NEW endorsement AUTOMATICALLY posts a concise
+  // "new endorsement added" alert (shift header, per-section counts, and any
+  // Urgent/High Prio AXOs listed up top) to that channel. Edits do not post, to avoid
+  // noise. WARNING: a webhook URL placed here is visible in the page source to anyone
+  // who can open the file — only use it for an internal/trusted-audience page, and note
+  // it fires only for saves made through this page. For a server-side credential that
+  // fires for ALL sources (any client, not just this page), prefer a Power Automate
+  // on-create flow instead — and use only ONE route to avoid double posts
+  // (see SETUP.md → Slack notifications).
+  slackWebhookUrl: '',         // e.g. 'https://hooks.slack.com/services/T000/B000/XXXX'
+  // OPTIONAL status mirror. Leave empty to keep it OFF (default). When set to the name
+  // of a SharePoint helper list, a successful Save in Connected mode UPSERTS one row per
+  // AXO touched by the endorsement (its current status), so a SCHEDULED Power Automate
+  // flow can read it and remind the team of Urgent/High Prio AXOs on a timer. Best-effort
+  // and non-blocking: if the list is absent or an upsert fails, the save still succeeds.
+  // Demo (local) mode skips the mirror entirely. See SETUP.md → Scheduled reminder.
+  axoStatusListName: 'QAAxoStatus'   // '' = feature disabled
 };
 
 /* ============================================================
@@ -980,9 +985,82 @@ function statusCounts(derived){
   return c;
 }
 
+/* ---- On-save Slack alert + status mirror helpers (pure, unit-tested) ----
+   These read a single endorsement MODEL (header + sections), not the derived set. */
+
+/* Count AXO lines per section, plus non-AXO notes and file references, for the
+   concise "new endorsement" alert summary line. */
+function sectionCounts(model){
+  const s = (model && model.sections) || {};
+  const c = {};
+  SECTIONS.forEach(sec => { c[sec.key] = Array.isArray(s[sec.key]) ? s[sec.key].length : 0; });
+  c.files = fileRefsOf(model).length;
+  return c;
+}
+
+/* The Urgent/High Prio AXO rows in this endorsement (by status, across all AXO
+   sections), so the alert can list them up top. */
+function urgentRowsOf(model){
+  const s = (model && model.sections) || {};
+  const out = [];
+  AXO_SECTION_KEYS.forEach(key => {
+    (Array.isArray(s[key]) ? s[key] : []).forEach(r => {
+      if (r && r.status === 'Urgent/High Prio') out.push(r);
+    });
+  });
+  return out;
+}
+
+/* The AXOs TOUCHED by this endorsement, each with the status just entered — one
+   entry per AXO (last occurrence wins). Drives the current-status mirror upsert;
+   returns [] for an endorsement with no AXO rows. */
+function touchedAxoStatuses(model){
+  const s = (model && model.sections) || {};
+  const map = new Map();
+  AXO_SECTION_KEYS.forEach(key => {
+    (Array.isArray(s[key]) ? s[key] : []).forEach(r => {
+      if (!r) return;
+      const axo = String(r.axo == null ? '' : r.axo).trim();
+      if (!axo) return;
+      map.set(axo, { axo, status: r.status || defaultStatusFor(key), note: r.note || '', section: key });
+    });
+  });
+  return Array.from(map.values());
+}
+
+/* Concise "new endorsement added" alert for the auto-post: shift header, any
+   Urgent/High Prio AXOs listed up top, then a one-line per-section count summary.
+   (The full six-section post stays with buildSlackText / "Copy latest as Slack".)
+   opts.updated prefixes "(updated)" for the optional edit-post case. */
+function buildSlackAlert(model, opts){
+  if (!model) return '';
+  const prefix = (opts && opts.updated) ? '(updated) ' : '';
+  const urgentGlyph = (STATUSES.find(s => s.key === 'Urgent/High Prio') || {}).glyph || '▲';
+  const lines = [];
+  lines.push(`*${prefix}New QA Endorsement — ${model.shiftDate} · ${model.shift} · ${model.qaResource}*`);
+  const urgent = urgentRowsOf(model);
+  if (urgent.length){
+    lines.push(`${urgentGlyph} *Urgent / High Prio (${urgent.length}):*`);
+    urgent.forEach(r => lines.push(`• AXO ${r.axo || '—'}${r.note ? ' — ' + r.note : ''}`));
+  }
+  const c = sectionCounts(model);
+  lines.push('_' + [
+    `Worked On ${c.workedOn}`,
+    `Needs Monitoring ${c.needsMonitoring}`,
+    `Blocker ${c.blocker}`,
+    `Urgent/High Prio ${c.urgent}`,
+    `Not Tested ${c.notTested}`,
+    `Non-AXO ${c.nonAxo}`,
+    `Files ${c.files}`
+  ].join(' · ') + '_');
+  return lines.join('\n').trim();
+}
+
 /* Sample data for demo mode only — clearly labelled as sample in the UI.
    8 endorsements, 16 unique AXOs. AXO 15226 has a 5-step journey ending
-   Passed; 15192 and 15175 currently Blocked. */
+   Passed; 15192 and 15175 currently Blocked; 15099 and 15277 currently
+   Urgent/High Prio (so the dashboard Urgent panel and the Slack alert's
+   urgent list are demonstrable); 15201 currently Failed. */
 const SEED_ENDORSEMENTS = [
   { id:'seed-e1', _seq:0, shiftDate:'2025-09-30', shift:'Day', qaResource:'Juan',
     sections:{
@@ -1030,8 +1108,11 @@ const SEED_ENDORSEMENTS = [
       workedOn:[ { axo:'15188', note:'Email template rendering verified across clients', status:'Passed' } ],
       needsMonitoring:[],
       blocker:[],
-      urgent:[ { axo:'15201', note:'Checkout 500s under load — needs priority retest', status:'Urgent/High Prio' } ],
-      notTested:[ { axo:'15277', note:'Audit log export feature', status:'Not Tested' } ],
+      urgent:[
+        { axo:'15201', note:'Checkout 500s under load — needs priority retest', status:'Urgent/High Prio' },
+        { axo:'15277', note:'Audit log export — escalated, blocking release sign-off', status:'Urgent/High Prio' }
+      ],
+      notTested:[],
       nonAxo:[ { note:'Smoke-tested the staging deploy at 02:00, all green' } ]
     },
     fileRefs:[] },
@@ -1060,9 +1141,9 @@ const SEED_ENDORSEMENTS = [
   { id:'seed-e5', _seq:6, shiftDate:'2025-10-01', shift:'Mid', qaResource:'Juan',
     sections:{
       workedOn:[ { axo:'15260', note:'Search — additional locale pass green', status:'Passed' } ],
-      needsMonitoring:[ { axo:'15099', note:'Password reset — monitoring bounce rate post-fix', status:'Needs Monitoring' } ],
+      needsMonitoring:[],
       blocker:[ { axo:'15192', note:'Blocked: staging DB migration failing, cannot seed test data', status:'Blocked' } ],
-      urgent:[],
+      urgent:[ { axo:'15099', note:'Password reset emails failing again in prod — needs urgent retest this shift', status:'Urgent/High Prio' } ],
       notTested:[ { axo:'15226', note:'New build dropped, awaiting a fresh test pass', status:'Not Tested' } ],
       nonAxo:[]
     },
@@ -1222,6 +1303,61 @@ const SP = {
       credentials:'same-origin'
     });
     if (!res.ok) throw new Error('deleteAttachment ' + res.status);
+    return true;
+  },
+
+  /* ---- Current-status mirror list (QAAxoStatus) ----
+     An OPTIONAL helper list holding one row per AXO with its CURRENT status, so a
+     scheduled Power Automate flow can read it and remind the team of Urgent/High
+     Prio AXOs on a timer. Standard REST with a fresh digest per write. */
+  axoStatusList(){ return SP_CONFIG.axoStatusListName; },
+  axoStatusBase(){ return `${this.site()}/_api/web/lists/getbytitle('${encodeURIComponent(this.axoStatusList())}')/items`; },
+
+  /* Look an AXO up by its AxoNumber text column. Returns the matching item (or null). */
+  async findAxoStatus(axo){
+    const safe = String(axo).replace(/'/g, "''");
+    const url = `${this.axoStatusBase()}?$select=Id,AxoNumber&$filter=AxoNumber eq '${encodeURIComponent(safe)}'&$top=1`;
+    const res = await fetch(url, {
+      method:'GET',
+      headers:{ 'Accept':'application/json;odata=nometadata' },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('findAxoStatus ' + res.status);
+    const data = await res.json();
+    return (data.value && data.value[0]) || null;
+  },
+
+  async addAxoStatus(fields){
+    const digest = await this.getDigest();
+    const res = await fetch(this.axoStatusBase(), {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'Content-Type':'application/json;odata=nometadata',
+        'X-RequestDigest': digest
+      },
+      credentials:'same-origin',
+      body: JSON.stringify(fields)
+    });
+    if (!res.ok) throw new Error('addAxoStatus ' + res.status);
+    return true;
+  },
+
+  async updateAxoStatus(id, fields){
+    const digest = await this.getDigest();
+    const res = await fetch(`${this.axoStatusBase()}(${id})`, {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'Content-Type':'application/json;odata=nometadata',
+        'X-RequestDigest': digest,
+        'IF-MATCH':'*',
+        'X-HTTP-Method':'MERGE'
+      },
+      credentials:'same-origin',
+      body: JSON.stringify(fields)
+    });
+    if (!res.ok) throw new Error('updateAxoStatus ' + res.status);
     return true;
   }
 };
@@ -1435,6 +1571,7 @@ function renderDashboard(){
 
   const attn = [
     { label:'Blocked', status:'Blocked', token:'--st-blocked' },
+    { label:'Urgent / High Prio', status:'Urgent/High Prio', token:'--st-urgent' },
     { label:'Needs Monitoring', status:'Needs Monitoring', token:'--st-monitoring' },
     { label:'Not Tested', status:'Not Tested', token:'--st-nottested' }
   ].map(col => {
@@ -1660,7 +1797,6 @@ function renderLog(){
             <span class="chip">QA: ${esc(e.qaResource)||'—'}</span>
           </span>
           <span class="e-actions">
-            ${slackWebhookEnabled() ? `<button class="iconbtn" data-slack="${esc(e.id)}" title="Post this endorsement to the configured Slack channel">↗ Post to Slack</button>` : ''}
             <button class="iconbtn" data-edit="${esc(e.id)}">Edit</button>
             <button class="iconbtn danger" data-del="${esc(e.id)}">Delete</button>
           </span>
@@ -1675,8 +1811,6 @@ function renderLog(){
 
   $$('#view-log [data-edit]').forEach(b => b.addEventListener('click', () => openForm(b.dataset.edit)));
   $$('#view-log [data-del]').forEach(b => b.addEventListener('click', () => doDelete(b.dataset.del)));
-  $$('#view-log [data-slack]').forEach(b => b.addEventListener('click', () =>
-    postEndorsementToSlack(state.endorsements.find(x => String(x.id) === String(b.dataset.slack)))));
 }
 
 async function doDelete(id){
@@ -1818,9 +1952,6 @@ function renderForm(){
 
       <div class="form-actions">
         <span class="hint">Date and QA Resource are required to save; everything else is optional.</span>
-        <label class="notify-slack" id="notifySlackWrap"${slackWebhookEnabled() ? '' : ' hidden'}>
-          <input type="checkbox" id="fNotifySlack"${notifySlackPref() ? ' checked' : ''}> Notify Slack
-        </label>
         <span class="sp"></span>
         <button type="button" class="iconbtn" id="fCancel">Cancel</button>
         <button type="submit" class="iconbtn primary" id="fSave">${editing ? 'Update endorsement' : 'Save endorsement'}</button>
@@ -1865,10 +1996,6 @@ function renderForm(){
     ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); if (ev !== 'dragleave' || e.target === drop) drop.classList.remove('over'); }));
     drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files); });
   }
-
-  // Remember the per-save Slack toggle.
-  const ns = $('#fNotifySlack');
-  if (ns) ns.addEventListener('change', () => lsSet('qaNotifySlack', ns.checked ? '1' : '0'));
 
   // Connected edit: list the item's real attachments and reconcile the draft.
   if (store.mode === 'sharepoint' && editing){
@@ -2098,11 +2225,18 @@ async function onSaveForm(ev){
     // Upload errors surface as toasts but never undo the saved item.
     if (store.mode === 'sharepoint') await syncAttachments(savedId, state.draft);
 
-    // Optional Slack post (off unless a webhook is configured AND the toggle is on).
-    const notify = $('#fNotifySlack');
-    if (slackWebhookEnabled() && notify && notify.checked){
-      const posted = await postToSlackWebhook(buildSlackText(model));
-      toast(posted ? 'Posted to Slack.' : 'Saved. Slack post failed.', posted ? 'ok' : 'err');
+    // Connected mode: mirror the touched AXOs' current status into the helper list,
+    // so a scheduled flow can read it. Best-effort — never blocks or reverts the save.
+    if (store.mode === 'sharepoint'){
+      try { await syncAxoStatusMirror(model); } catch (e){ /* never block the save */ }
+    }
+
+    // Automatic Slack notification on a NEW endorsement (no-op if no webhook is
+    // configured). Edits do not post, to avoid noise. Non-blocking: a failed post
+    // shows a toast but never reverts the save.
+    if (!editing && slackWebhookEnabled()){
+      const posted = await postToSlackWebhook(buildSlackAlert(model));
+      if (!posted) toast('Endorsement saved — the Slack notification could not be sent.', 'err');
     }
 
     state.editingId = null;
@@ -2145,6 +2279,41 @@ async function syncAttachments(id, draft){
     if (!kept.has(nm)){
       try { await SP.deleteAttachment(id, nm); } catch (e){ toast(`Could not remove attachment "${nm}": ${e.message}`, 'err'); }
     }
+  }
+}
+
+/* Connected mode: UPSERT the current status of each AXO touched by this save into
+   the optional QAAxoStatus helper list (one row per AXO). Look each AXO up by
+   AxoNumber; MERGE if present, else create. Best-effort and NON-BLOCKING — if the
+   list is missing or any upsert fails, a single toast is shown and the main save is
+   left intact. Skipped entirely when the list name is empty (feature off); demo mode
+   never calls this. */
+async function syncAxoStatusMirror(model){
+  if (store.mode !== 'sharepoint') return;                           // demo: no server
+  if (!String(SP_CONFIG.axoStatusListName || '').trim()) return;     // feature disabled
+  const touched = touchedAxoStatuses(model);
+  if (!touched.length) return;
+  const now = new Date().toISOString();
+  let failures = 0;
+  for (const t of touched){
+    const fields = {
+      Title: t.axo,
+      AxoNumber: t.axo,
+      Status: t.status,
+      Note: t.note,
+      QAResource: model.qaResource || '',
+      ShiftDate: model.shiftDate || '',
+      Section: t.section,
+      UpdatedAt: now
+    };
+    try {
+      const existing = await SP.findAxoStatus(t.axo);
+      if (existing) await SP.updateAxoStatus(existing.Id, fields);
+      else await SP.addAxoStatus(fields);
+    } catch (e){ failures++; }
+  }
+  if (failures){
+    toast(`Status mirror: ${failures} of ${touched.length} AXO row(s) could not be updated in ${esc(SP_CONFIG.axoStatusListName)}. The endorsement was saved.`, 'err');
   }
 }
 
@@ -2209,7 +2378,7 @@ async function copyLatest(){
 
 /* ============================================================
    OPTIONAL SLACK WEBHOOK (off by default — nothing posts unless
-   SP_CONFIG.slackWebhookUrl is set AND the per-save toggle is on)
+   SP_CONFIG.slackWebhookUrl is set; then a NEW endorsement auto-posts)
    ============================================================ */
 function slackWebhookEnabled(){ return !!String(SP_CONFIG.slackWebhookUrl || '').trim(); }
 
@@ -2219,10 +2388,6 @@ function slackWebhookEnabled(){ return !!String(SP_CONFIG.slackWebhookUrl || '')
 function slackWebhookBody(text){
   return 'payload=' + encodeURIComponent(JSON.stringify({ text: text || '' }));
 }
-
-/* Default state of the per-save "Notify Slack" toggle: ON when a webhook is
-   configured, unless the user turned it off (remembered in localStorage). */
-function notifySlackPref(){ return lsGet('qaNotifySlack', '1') !== '0'; }
 
 /* POST the Slack text to the configured webhook. Returns false without sending
    when no webhook is set. Uses mode:'no-cors' so the response is opaque — a
@@ -2241,14 +2406,6 @@ async function postToSlackWebhook(text){
   } catch (e){
     return false;
   }
-}
-
-/* Manual "Post to Slack" affordance for one saved endorsement. */
-async function postEndorsementToSlack(e){
-  if (!e){ toast('Nothing to post yet.', 'err'); return; }
-  if (!slackWebhookEnabled()){ toast('No Slack webhook is configured.', 'err'); return; }
-  const ok = await postToSlackWebhook(buildSlackText(e));
-  toast(ok ? 'Posted to Slack.' : 'Slack post failed.', ok ? 'ok' : 'err');
 }
 
 /* ============================================================

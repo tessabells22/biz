@@ -145,8 +145,10 @@ Near the top of `index.html`:
 
 ```js
 const SP_CONFIG = {
-  siteUrl: '',                 // e.g. 'https://contoso.sharepoint.com/sites/QA'
-  listName: 'QAEndorsements'
+  siteUrl: '',                       // e.g. 'https://contoso.sharepoint.com/sites/QA'
+  listName: 'QAEndorsements',
+  slackWebhookUrl: '',               // optional — see "Slack notifications"
+  axoStatusListName: 'QAAxoStatus'   // optional — see "Scheduled reminder" ('' = off)
 };
 ```
 
@@ -157,6 +159,8 @@ const SP_CONFIG = {
   *without* a trailing slash.
 - Change `listName` only if you named the list something other than
   `QAEndorsements`.
+- `slackWebhookUrl` and `axoStatusListName` are optional and covered under **Slack
+  notifications** below; both ship off/empty of a live webhook by default.
 
 The data layer uses standard SharePoint REST and works on SharePoint Online /
 modern pages and classic:
@@ -203,33 +207,37 @@ the SharePoint list.**
 
 ---
 
-## Slack notifications (optional)
+## Slack notifications
 
-Saving an endorsement can post its Slack handover text to a Slack channel. This is
-**off by default** — nothing is posted unless you set it up. There are two routes;
-pick one.
+The tool always offers **Copy latest as Slack** in the header (clipboard, no setup) —
+it copies the full six-section "Endorsement of Tasks" post for the latest handover.
 
-The tool always offers the existing **Copy latest as Slack** button (clipboard, no
-integration needed). The two options below *post automatically*.
+### Notify on every new endorsement
 
-### 1. Recommended — Power Automate (credential stays server-side)
+To post a short alert automatically whenever a new endorsement is logged, set up
+**one** of the two routes below. **Pick only one** — running both posts every new
+endorsement twice.
+
+#### 1. Recommended — Power Automate on-create flow (reliable, credential server-side)
 
 Build a flow in Power Automate:
 
 1. Trigger: **When an item is created** → site = your site, list = **`QAEndorsements`**.
-2. (Optional) Add a **Condition** or **Compose** to format the message from the item's
-   columns / `Payload`.
-3. Action: **Post message** (Slack connector) to the target channel, *or* an **HTTP**
-   action `POST`ing to a Slack Incoming Webhook with body `{ "text": "…" }`.
+2. *(Optional)* Add a **Compose** to format the message from the item's columns /
+   `Payload`.
+3. Action: **Post message in a chat or channel** (Slack connector) to the target
+   channel, *or* an **HTTP** action `POST`ing to a Slack Incoming Webhook with body
+   `{ "text": "…" }`.
+4. Save the flow and turn it on.
 
 Why this is preferred:
 
 - The Slack credential (connection or webhook) lives in the flow, **never in the page
   source** — nobody who opens `index.html` can read it.
-- It fires for **every** item created in the list, including items created by Power
-  Automate or any other client, not only saves made through this page.
+- It is **server-side** and fires for **every** item created in the list, including
+  items created by any other client, not only saves made through this page.
 
-### 2. Alternative — Slack Incoming Webhook in the page
+#### 2. Alternative — Slack Incoming Webhook in the page (quick)
 
 Set the webhook URL near the top of `index.html`:
 
@@ -240,24 +248,87 @@ const SP_CONFIG = {
 };
 ```
 
-Create the webhook in Slack via an app with **Incoming Webhooks** enabled (Slack →
+Create the webhook via a Slack app with **Incoming Webhooks** enabled (Slack →
 *Your apps* → *Incoming Webhooks* → *Add New Webhook to Workspace*). When
-`slackWebhookUrl` is non-empty:
+`slackWebhookUrl` is non-empty, saving a **new** endorsement **automatically** posts a
+concise alert to that channel:
 
-- Each successful Save posts the generated Slack text to that channel. The post is sent
-  as a CORS "simple request" (`Content-Type: application/x-www-form-urlencoded`, body
-  `payload=<json>`, `mode:'no-cors'`), so the browser needs no proxy. A failed post is
-  **never** allowed to fail the Save — it shows a non-blocking toast.
-- A per-save **Notify Slack** checkbox appears in the save bar (on by default when a
-  webhook is configured, remembered per browser) so a user can skip the auto-post for a
-  given entry.
-- Each Shift Log card gains a **Post to Slack** button to (re)post that endorsement on
-  demand.
+- the **shift header** (date · shift · QA Resource),
+- any **Urgent / High Prio** AXOs for that endorsement, listed up top, and
+- a one-line **per-section count** summary.
+
+The post is sent as a CORS "simple request" (`Content-Type:
+application/x-www-form-urlencoded`, body `payload=<json>`, `mode:'no-cors'`), so the
+browser needs no proxy. A failed post is **never** allowed to fail the Save — it only
+shows a non-blocking toast. **Editing** an existing endorsement does **not** post, to
+avoid repeat noise.
 
 > **⚠️ The webhook URL is visible in the page source** to anyone who can open the file.
 > Only use this route for an **internal / trusted-audience** page. It also fires **only
 > for saves made through this page** — items created by other clients are not posted.
-> For a server-side secret that covers all sources, use route 1.
+> **Do not also run the Power Automate on-create flow (route 1), or every new
+> endorsement will be posted twice.** For a server-side secret that covers all sources,
+> prefer route 1.
+
+### Scheduled Urgent / High Prio reminder
+
+A static page cannot run on a timer, so a recurring "remind us of the urgent AXOs"
+message must be a **scheduled Power Automate flow**. To make that flow trivial, the
+tracker keeps an **optional** helper list mirroring each AXO's **current** status.
+
+**Helper list — `QAAxoStatus`** *(OPTIONAL — only needed for this reminder)*. Create a
+list with these columns; everything is stored as **text** so setup is easy:
+
+| Column | Type | Notes |
+|---|---|---|
+| `Title` | Single line of text | The AXO number (exists by default). |
+| `AxoNumber` | Single line of text | The AXO number again (looked up by the tracker). |
+| `Status` | Single line of text | The AXO's current status value, e.g. `Urgent/High Prio`. |
+| `Note` | Multiple lines of plain text | The latest note for that AXO. |
+| `QAResource` | Single line of text | QA who last touched it. |
+| `ShiftDate` | Single line of text | ISO date (`YYYY-MM-DD`) of the latest touch. |
+| `Section` | Single line of text | The section key the AXO landed in. |
+| `UpdatedAt` | Single line of text | ISO timestamp of the last mirror write. |
+
+Enable the mirror by setting `axoStatusListName` in `SP_CONFIG` (default
+`'QAAxoStatus'`; set it to `''` to turn the feature off):
+
+```js
+const SP_CONFIG = {
+  …
+  axoStatusListName: 'QAAxoStatus'
+};
+```
+
+On each Save in **Connected** mode, the tracker **upserts one row per AXO touched by
+that endorsement** — it looks the AXO up by `AxoNumber`, merges the existing row if
+found, otherwise creates one. Only changed AXOs are written, so the list stays current
+with minimal writes, and it never deletes rows. The mirror is **best-effort**: if the
+list is absent or a write fails, the endorsement still saves (you just get a small
+toast). Demo (local) mode skips the mirror entirely.
+
+Then build the scheduled flow:
+
+1. Trigger: **Recurrence** — e.g. daily, or at each shift start.
+2. Action: **Get items** from **`QAAxoStatus`** with the OData filter
+
+   ```
+   Status eq 'Urgent/High Prio'
+   ```
+
+   *(to also catch blockers, use `Status eq 'Urgent/High Prio' or Status eq 'Blocked'`).*
+3. **Condition**: `length(body('Get_items')?['value'])` is greater than `0`.
+4. If yes → **Compose** / **Select** a message listing the AXOs, for example:
+
+   ```
+   :rotating_light: Urgent / High Prio AXOs still open (2):
+   • AXO 15099 — Password reset emails failing again in prod (Juan)
+   • AXO 15277 — Audit log export, blocking release sign-off (Aisha)
+   ```
+5. **Post** that message to Slack (connector or Incoming Webhook).
+
+Because the tracker keeps `QAAxoStatus` current on every save, the reminder always
+reflects the latest statuses.
 
 ---
 
