@@ -337,9 +337,12 @@
     display:flex;flex-direction:column;gap:3px;
   }
   .attn li button:hover{border-color:color-mix(in srgb,var(--ac) 45%,var(--border));background:var(--surface)}
-  .attn li .axo-top{display:flex;align-items:center;gap:8px;justify-content:space-between}
-  .attn li .axo-no{font-weight:650;font-variant-numeric:tabular-nums}
-  .attn li .nt{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .attn li .axo-top{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;max-width:100%}
+  .attn li .axo-no{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+  /* Stacked below the AXO number, the pill gets the full card width and wraps its
+     short label onto a second line rather than spilling past the card edge. */
+  .attn li .st{max-width:100%;white-space:normal;text-align:left}
+  .attn li .nt{font-size:11.5px;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .attn .empty{font-size:12px;color:var(--muted);padding:10px;border:1px dashed var(--border);border-radius:var(--radius-sm);text-align:center}
 
   /* ---------- Workload bars ---------- */
@@ -354,11 +357,12 @@
   /* ---------- Status pill ---------- */
   .st{
     display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+    max-width:100%;box-sizing:border-box;vertical-align:middle;
     font-size:11.5px;font-weight:650;line-height:1;padding:4px 9px 4px 7px;border-radius:999px;
     color:var(--sc);background:color-mix(in srgb,var(--sc) 13%,var(--surface));
     border:1px solid color-mix(in srgb,var(--sc) 34%,transparent);
   }
-  .st .g{font-size:10px;line-height:1}
+  .st .g{font-size:10px;line-height:1;flex:none}
 
   /* ---------- Toolbar (tracker) ---------- */
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
@@ -791,10 +795,10 @@
 const STATUSES = [
   { key:'Not Tested',                   token:'--st-nottested',      glyph:'○' },
   { key:'In Progress',                  token:'--st-inprogress',     glyph:'◐' },
-  { key:'Passed - Initial',             token:'--st-passed-initial', glyph:'↗' },
-  { key:'Passed - Develop/Deployment',  token:'--st-passed',         glyph:'✓' },
-  { key:'Failed - Initial',             token:'--st-failed',         glyph:'✕' },
-  { key:'Failed - Develop/Deployment',  token:'--st-failed',         glyph:'✕' },
+  { key:'Passed - Initial',             token:'--st-passed-initial', glyph:'↗', short:'Passed · Initial' },
+  { key:'Passed - Develop/Deployment',  token:'--st-passed',         glyph:'✓', short:'Passed · Dev/Deploy' },
+  { key:'Failed - Initial',             token:'--st-failed',         glyph:'✕', short:'Failed · Initial' },
+  { key:'Failed - Develop/Deployment',  token:'--st-failed',         glyph:'✕', short:'Failed · Dev/Deploy' },
   { key:'Needs Monitoring',             token:'--st-monitoring',     glyph:'◉' },
   { key:'Urgent/High Prio',             token:'--st-urgent',         glyph:'▲' },
   { key:'Blocked',                      token:'--st-blocked',        glyph:'■' },
@@ -1521,7 +1525,10 @@ function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&
 function statusMeta(key){ return STATUSES.find(s => s.key === key) || STATUSES[0]; }
 function statusPill(key){
   const m = statusMeta(key);
-  return `<span class="st" style="--sc:var(${m.token})"><span class="g">${m.glyph}</span>${esc(m.key)}</span>`;
+  // Compact UI pill: show the short label when defined, full label always in the
+  // tooltip. Stored values and Slack output keep the full key (see buildSlackText).
+  const label = m.short || m.key;
+  return `<span class="st" style="--sc:var(${m.token})" title="${esc(m.key)}"><span class="g">${m.glyph}</span>${esc(label)}</span>`;
 }
 function fileRefLineHtml(r){
   const label = esc(r.name || r.url || 'file');
