@@ -1,0 +1,149 @@
+# NPD QA Endorsement Tracker — Google Apps Script edition
+
+A self-contained tracker a single person can deploy under **their own Google account**
+— **no SharePoint, no tenant admin, no app registration**. The page is served by a
+container-bound **Google Apps Script** Web App; data lives in a **Google Sheet**,
+uploaded files in **Google Drive**, and **Slack posting + scheduled reminders run
+server-side**.
+
+Same UI, ShipERP branding, and four views as the SharePoint edition (Dashboard with
+the "Needs attention now" panels, AXO Tracker, Shift Log, and the status-routed
+New/Edit builder with a live Slack preview). Only the data/integration layer changed:
+`google.script.run` + a Google Sheet instead of SharePoint REST.
+
+> **Prefer SharePoint?** If you later get SharePoint access, the SharePoint edition is
+> in [`../qa-endorsement-tracker/`](../qa-endorsement-tracker/) (see its `SETUP.md`).
+
+---
+
+## 1. Create the Sheet + Apps Script project
+
+1. Create a new **Google Sheet** — this is your database.
+2. In the Sheet, open **Extensions &rsaquo; Apps Script**. This makes a
+   **container-bound** script (so `SpreadsheetApp.getActive()` targets this Sheet).
+
+You don't need to pre-create any tabs — the server creates an **`Endorsements`** tab
+with the header row `Id, ShiftDate, Shift, QAResource, Payload, CreatedAt, UpdatedAt`
+on first use.
+
+## 2. Add the three files
+
+In the Apps Script editor:
+
+1. **`Code.gs`** — replace the default `Code.gs` contents with this repo's `Code.gs`.
+2. **`index` (HTML)** — click **+ &rsaquo; HTML**, name it exactly **`index`** (no
+   extension), and paste this repo's `index.html` into it.
+3. **Manifest** — **Project Settings** (gear) &rsaquo; tick **"Show `appsscript.json`
+   manifest file in editor"**, open `appsscript.json` from the editor, and paste this
+   repo's manifest. It requests these scopes (you'll approve them on first run/deploy):
+   Sheets, Drive (`drive.file`), external requests (Slack), and ScriptApp (triggers).
+
+## 3. Configure (Script Properties)
+
+Open **Project Settings &rsaquo; Script Properties &rsaquo; Add script property**:
+
+| Property | Value | Required |
+|---|---|---|
+| `SLACK_WEBHOOK_URL` | your Slack **Incoming Webhook** URL | Required for Slack posts |
+| `REMIND_INCLUDE_BLOCKED` | `true` to also remind about **Blocked** AXOs | Optional |
+| `DRIVE_FOLDER_ID` | — | Auto-managed; leave unset |
+
+**Make a Slack Incoming Webhook:** Slack &rsaquo; *Your apps* &rsaquo; create/select an
+app &rsaquo; **Incoming Webhooks** &rsaquo; *Add New Webhook to Workspace* &rsaquo; pick a
+channel &rsaquo; copy the `https://hooks.slack.com/services/…` URL.
+
+> The webhook lives server-side in Script Properties — it is **never** in the page
+> source. If `SLACK_WEBHOOK_URL` is unset, saves still work; Slack posting is simply
+> skipped (logged). You can also set it from the editor by running
+> `setConfig('https://hooks.slack.com/services/…')` once.
+
+## 4. Deploy as a Web App
+
+1. **Deploy &rsaquo; New deployment &rsaquo;** select type **Web app**.
+2. **Execute as:** **Me** (data lives in *your* Sheet; everyone runs as you).
+3. **Who has access:** pick one —
+   - **Anyone with Google account** — login-gated; recommended.
+   - **Anyone** — link-only, no login (anonymous). Convenient but anyone with the URL
+     can use it.
+   - **Anyone within `<your org>`** — only shows for Google Workspace accounts;
+     tightest option.
+4. **Deploy**, authorize the scopes when prompted, and copy the **Web App URL**. Share
+   that URL with the team.
+
+To tighten or loosen access later, edit the manifest's `webapp.access`
+(`ANYONE_ANONYMOUS` / `ANYONE` / `DOMAIN` / `MYSELF`) and create a **new deployment**
+(or **Manage deployments &rsaquo; Edit**).
+
+## 5. Install the scheduled reminders
+
+In the editor, select the function **`setupShiftReminders`** and **Run** it **once**
+(authorize if prompted). It installs three native daily time-triggers that post a
+start-of-shift reminder of any open **Urgent/High Prio** AXOs (plus **Blocked** when
+`REMIND_INCLUDE_BLOCKED=true`). If none are open, it stays quiet (no spam).
+
+The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT**:
+
+| Shift | PHT start | Trigger |
+|---|---|---|
+| Day | 5:00 AM | `atHour(5)` |
+| Mid | 1:00 PM | `atHour(13)` |
+| Night | 10:00 PM | `atHour(22)` |
+
+> Apps Script time-triggers fire within the given hour (not exactly on the minute).
+> Re-running `setupShiftReminders` is safe — it deletes existing `sendUrgentReminder`
+> triggers first, then recreates the three.
+
+## 6. Access & security notes
+
+- **Data** lives in the **owner's Google Sheet**; uploaded files in the owner's Drive
+  folder **"NPD QA Test Files"** (shared "anyone with link — view" so links open for
+  the team).
+- **Execute as Me** means every visitor's reads/writes run under the **owner's**
+  identity and quotas — the Sheet and Drive are the owner's.
+- The **Slack webhook** is in **Script Properties**, never in the page source.
+- **"Anyone / anonymous" access** means anyone with the Web App URL can use the tool.
+  Prefer **"Anyone with Google account"** (login-gated) or **domain** access where
+  possible.
+
+## 7. Migration (move data in / out)
+
+- **Out:** the Sheet **is** the database — `File &rsaquo; Download` it, or copy rows.
+  Each row's `Payload` cell is `JSON.stringify({ sections, fileRefs })`.
+- **In:** paste rows into the `Endorsements` tab matching the header columns. `Id` can
+  be any unique string (the server generates UUIDs for app-created rows); set
+  `Payload` to the JSON shape above. Leave `CreatedAt`/`UpdatedAt` blank if unknown.
+- From the SharePoint edition, the stored **model is identical**
+  (`{ id, shiftDate, shift, qaResource, sections{…}, fileRefs[] }` with the sections +
+  fileRefs as one JSON string), so a `Payload` value copies across unchanged. Note
+  SharePoint **attachment** file-refs won't resolve here; re-upload those files (they
+  become Drive **links**) or paste a link.
+- The **seeded sample rows appear only in demo mode** (when the page is opened outside
+  Apps Script). The real Sheet **starts empty**.
+
+---
+
+## How it works
+
+- **Runtime detection (`index.html`).** If `google.script.run` exists → **Connected —
+  Google** mode (all CRUD via the server). Otherwise → **Demo (local)** mode with
+  sample data in `localStorage`, so the page still previews when opened directly.
+- **Data layer.** The `store.list / add / update / remove` interface wraps
+  `google.script.run` calls in Promises (`withSuccessHandler` / `withFailureHandler`),
+  calling `apiList()`, `apiAdd(model)`, `apiUpdate(id, model)`, `apiRemove(id)`. The
+  view code is unchanged from the SharePoint edition.
+- **File upload.** In Connected mode a chosen file is read to base64 (FileReader) and
+  sent to `apiUploadFile(name, mimeType, base64)`; the server saves it to the Drive
+  folder and returns `{ name, url }`, stored as a `kind:'link'` fileRef pointing at the
+  Drive URL (so it renders/opens like any pasted link). Demo mode keeps the inline
+  data-URL fallback with a size cap. Pasting a link also still works.
+- **Slack (server-side).** `apiAdd` calls `sendNewEndorsementAlert_`, which posts
+  `buildSlackAlert(model)` — the same alert content as the SharePoint edition (shift
+  header, Urgent/High Prio AXOs up top, per-section counts). A failed post never fails
+  the save. Edits don't post. The header **"Copy latest as Slack"** button is
+  unchanged (client-side clipboard).
+- **Reminders (server-side).** `sendUrgentReminder` derives each AXO's current status
+  with the same `deriveAxos` logic as the client and posts the open Urgent/High Prio
+  (and optionally Blocked) AXOs at each shift start via the native time-triggers.
+
+The pure functions (`deriveAxos`, `buildSlackAlert`, status→section mapping, etc.) are
+**copied verbatim** into `Code.gs`, so the server and client produce identical text.
