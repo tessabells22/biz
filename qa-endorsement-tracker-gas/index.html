@@ -65,6 +65,7 @@
     --st-blocked:#4a3aa7;
     --st-failed:#cc3838;
     --st-passed:#0a7d2c;
+    --st-passed-initial:#08756b;  /* passed, initial stage — ready to promote to develop (teal, distinct from final green) */
     --ok:#1E8E52;              /* success/check green (connected pill) */
 
     /* categorical palette for NPD QA workload (dataviz default order) */
@@ -107,6 +108,7 @@
       --st-blocked:#9085e9;
       --st-failed:#e06a6a;
       --st-passed:#2fb24f;
+      --st-passed-initial:#33c2ad;
       --ok:#35B06E;
       --cat-1:#35A0E0; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
       --cat-5:#d55181; --cat-6:#2fb24f; --cat-7:#9085e9; --cat-8:#e66767;
@@ -143,6 +145,7 @@
     --st-blocked:#9085e9;
     --st-failed:#e06a6a;
     --st-passed:#2fb24f;
+    --st-passed-initial:#33c2ad;
     --ok:#35B06E;
     --cat-1:#35A0E0; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
     --cat-5:#d55181; --cat-6:#2fb24f; --cat-7:#9085e9; --cat-8:#e66767;
@@ -317,22 +320,24 @@
   .tile .t-lab .sdot{width:9px;height:9px;border-radius:50%;background:var(--tc);flex:none}
   .tile:hover{border-color:color-mix(in srgb,var(--tc) 45%,var(--border))}
 
-  .dash-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px;align-items:start}
-  @media(max-width:860px){.dash-grid{grid-template-columns:1fr}}
+  .dash-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px;align-items:start}
 
-  .attn-cols{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .attn-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
   @media(max-width:520px){.attn-cols{grid-template-columns:1fr}}
-  .attn{display:flex;flex-direction:column}
-  .attn h3{font-size:12.5px;font-weight:650;letter-spacing:.01em;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .attn{display:flex;flex-direction:column;padding:11px 11px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);border-top:3px solid var(--ac,var(--muted))}
+  .attn.ready{background:color-mix(in srgb,var(--ac) 6%,var(--surface));border-color:color-mix(in srgb,var(--ac) 28%,var(--border))}
+  .attn h3{font-size:12.5px;font-weight:650;letter-spacing:.01em;display:flex;align-items:center;gap:8px;margin-bottom:4px}
   .attn h3 .cnt{margin-left:auto;font-size:11px;font-weight:700;color:var(--surface);background:var(--ac,var(--muted));padding:1px 8px;border-radius:999px;min-width:20px;text-align:center}
   .attn h3 .sdot{width:9px;height:9px;border-radius:50%;background:var(--ac)}
+  .attn .attn-note{font-size:10.5px;color:var(--muted);margin:0 0 9px;letter-spacing:.01em}
   .attn ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
   .attn li button{
     width:100%;text-align:left;border:1px solid var(--border);background:var(--surface-2);
     border-radius:var(--radius-sm);padding:8px 10px;color:var(--fg);
-    display:flex;flex-direction:column;gap:2px;
+    display:flex;flex-direction:column;gap:3px;
   }
   .attn li button:hover{border-color:color-mix(in srgb,var(--ac) 45%,var(--border));background:var(--surface)}
+  .attn li .axo-top{display:flex;align-items:center;gap:8px;justify-content:space-between}
   .attn li .axo-no{font-weight:650;font-variant-numeric:tabular-nums}
   .attn li .nt{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .attn .empty{font-size:12px;color:var(--muted);padding:10px;border:1px dashed var(--border);border-radius:var(--radius-sm);text-align:center}
@@ -784,13 +789,19 @@
    No DOM / browser references in this block (ends at the END marker below).
    ============================================================ */
 const STATUSES = [
-  { key:'Not Tested',        token:'--st-nottested',  glyph:'○' },
-  { key:'In Progress',       token:'--st-inprogress', glyph:'◐' },
-  { key:'Needs Monitoring',  token:'--st-monitoring', glyph:'◉' },
-  { key:'Urgent/High Prio',  token:'--st-urgent',     glyph:'▲' },
-  { key:'Blocked',           token:'--st-blocked',    glyph:'■' },
-  { key:'Failed',            token:'--st-failed',     glyph:'✕' },
-  { key:'Passed',            token:'--st-passed',     glyph:'✓' }
+  { key:'Not Tested',                   token:'--st-nottested',      glyph:'○' },
+  { key:'In Progress',                  token:'--st-inprogress',     glyph:'◐' },
+  { key:'Passed - Initial',             token:'--st-passed-initial', glyph:'↗' },
+  { key:'Passed - Develop/Deployment',  token:'--st-passed',         glyph:'✓' },
+  { key:'Failed - Initial',             token:'--st-failed',         glyph:'✕' },
+  { key:'Failed - Develop/Deployment',  token:'--st-failed',         glyph:'✕' },
+  { key:'Needs Monitoring',             token:'--st-monitoring',     glyph:'◉' },
+  { key:'Urgent/High Prio',             token:'--st-urgent',         glyph:'▲' },
+  { key:'Blocked',                      token:'--st-blocked',        glyph:'■' },
+  /* Legacy values — still RECOGNIZED (pills render, dashboard buckets them) but
+     no longer OFFERED in the entry builder dropdown. Old/live data may hold them. */
+  { key:'Failed',                       token:'--st-failed',         glyph:'✕', legacy:true },
+  { key:'Passed',                       token:'--st-passed',         glyph:'✓', legacy:true }
 ];
 
 /* Section definitions mirror the real Slack "Endorsement of Tasks" modal.
@@ -857,16 +868,21 @@ const AXO_SECTION_KEYS = SECTIONS.filter(s => s.axo).map(s => s.key);
 /* STATUS → stored section key. In the unified row builder, picking a status is
    what files an AXO into a section bucket. This is the SAME bucket the old
    sectioned form used, so the stored payload, derivation, Shift Log and
-   Slack-copy output are all unchanged. In Progress / Passed / Failed all live
-   under "Worked On during Shift and Status". */
+   Slack-copy output are all unchanged. In Progress, the Passed/Failed stage
+   variants, and the legacy Passed/Failed all live under "Worked On during Shift
+   and Status". */
 const STATUS_SECTION = {
-  'Not Tested':       'notTested',
-  'In Progress':      'workedOn',
-  'Passed':           'workedOn',
-  'Failed':           'workedOn',
-  'Needs Monitoring': 'needsMonitoring',
-  'Urgent/High Prio': 'urgent',
-  'Blocked':          'blocker'
+  'Not Tested':                  'notTested',
+  'In Progress':                 'workedOn',
+  'Passed - Initial':            'workedOn',
+  'Passed - Develop/Deployment': 'workedOn',
+  'Failed - Initial':            'workedOn',
+  'Failed - Develop/Deployment': 'workedOn',
+  'Passed':                      'workedOn',  // legacy
+  'Failed':                      'workedOn',  // legacy
+  'Needs Monitoring':            'needsMonitoring',
+  'Urgent/High Prio':            'urgent',
+  'Blocked':                     'blocker'
 };
 function sectionForStatus(status){
   return STATUS_SECTION[status] || 'workedOn';
@@ -1150,9 +1166,16 @@ function buildSlackAlert(model, opts){
 
 /* Sample data for demo mode only — clearly labelled as sample in the UI.
    8 endorsements, 16 unique AXOs. AXO 15226 has a 5-step journey ending
-   Passed; 15192 and 15175 currently Blocked; 15099 and 15277 currently
-   Urgent/High Prio (so the dashboard Urgent panel and the Slack alert's
-   urgent list are demonstrable); 15201 currently Failed. */
+   `Passed - Develop/Deployment` (so it lands under Passed). Current statuses are
+   seeded to showcase the staged flow:
+     • `Passed - Initial`  → 15210, 15260  (populate "For possible deployment to develop")
+     • Passed (final)      → 15226 & 15164 (`Passed - Develop/Deployment`) + 15188 (legacy `Passed`)
+     • Failed              → 15201 (`Failed - Develop/Deployment`) — also shown under Needs Monitoring
+     • Blocked             → 15192, 15175
+     • Urgent/High Prio    → 15099, 15277   • Needs Monitoring → 15241, 15118, 15305
+     • Not Tested          → 15233, 15150, 15312
+   Legacy flat `Passed`/`Failed` also appear in historical steps to prove they
+   still parse. */
 const SEED_ENDORSEMENTS = [
   { id:'seed-e1', _seq:0, shiftDate:'2025-09-30', shift:'Day', qaResource:'Juan',
     sections:{
@@ -1210,7 +1233,7 @@ const SEED_ENDORSEMENTS = [
     fileRefs:[] },
   { id:'seed-e4', _seq:4, shiftDate:'2025-10-01', shift:'Day', qaResource:'Aisha',
     sections:{
-      workedOn:[ { axo:'15210', note:'Login accessibility — final pass confirmed', status:'Passed' } ],
+      workedOn:[ { axo:'15210', note:'Login accessibility — initial pass green, ready to promote to develop', status:'Passed - Initial' } ],
       needsMonitoring:[ { axo:'15241', note:'Promo-code edge cases still flaky', status:'Needs Monitoring' } ],
       blocker:[ { axo:'15175', note:'Blocked: waiting on 3rd-party sandbox credentials from vendor', status:'Blocked' } ],
       urgent:[],
@@ -1222,7 +1245,7 @@ const SEED_ENDORSEMENTS = [
     ] },
   { id:'seed-e8', _seq:5, shiftDate:'2025-10-01', shift:'Day', qaResource:'Marco',
     sections:{
-      workedOn:[ { axo:'15164', note:'Profile avatar upload verified', status:'Passed' } ],
+      workedOn:[ { axo:'15164', note:'Profile avatar upload verified on develop/deployment', status:'Passed - Develop/Deployment' } ],
       needsMonitoring:[ { axo:'15118', note:'CSV import — watching memory use on large files', status:'Needs Monitoring' } ],
       blocker:[],
       urgent:[],
@@ -1232,7 +1255,7 @@ const SEED_ENDORSEMENTS = [
     fileRefs:[] },
   { id:'seed-e5', _seq:6, shiftDate:'2025-10-01', shift:'Mid', qaResource:'Juan',
     sections:{
-      workedOn:[ { axo:'15260', note:'Search — additional locale pass green', status:'Passed' } ],
+      workedOn:[ { axo:'15260', note:'Search filters — initial pass green, ready to promote to develop', status:'Passed - Initial' } ],
       needsMonitoring:[],
       blocker:[ { axo:'15192', note:'Blocked: staging DB migration failing, cannot seed test data', status:'Blocked' } ],
       urgent:[ { axo:'15099', note:'Password reset emails failing again in prod — needs urgent retest this shift', status:'Urgent/High Prio' } ],
@@ -1242,10 +1265,10 @@ const SEED_ENDORSEMENTS = [
     fileRefs:[] },
   { id:'seed-e6', _seq:7, shiftDate:'2025-10-01', shift:'Night', qaResource:'Priya',
     sections:{
-      workedOn:[ { axo:'15226', note:'Full regression green, signed off', status:'Passed' } ],
+      workedOn:[ { axo:'15226', note:'Full regression green, signed off on develop/deployment', status:'Passed - Develop/Deployment' } ],
       needsMonitoring:[ { axo:'15305', note:'Report export timeout still intermittent overnight', status:'Needs Monitoring' } ],
       blocker:[],
-      urgent:[ { axo:'15201', note:'Checkout load retest failed — 500s persist at 200 RPS', status:'Failed' } ],
+      urgent:[ { axo:'15201', note:'Checkout load retest failed — 500s persist at 200 RPS', status:'Failed - Develop/Deployment' } ],
       notTested:[ { axo:'15150', note:'Onboarding checklist — still queued', status:'Not Tested' } ],
       nonAxo:[]
     },
@@ -1631,37 +1654,79 @@ async function enterDemoFromError(){
 /* ============================================================
    DASHBOARD
    ============================================================ */
+
+/* Dashboard tiles/buckets. Each bucket matches one or more CURRENT statuses
+   (derived from the latest endorsement), so an AXO moves between buckets
+   automatically as its status updates — no extra state machine. The split of
+   Passed into a deploy-readiness stage and a final stage falls straight out of
+   deriveAxos:
+     • "For possible deployment to develop" = current `Passed - Initial`
+     • "Passed"  = current `Passed - Develop/Deployment` (+ legacy `Passed`)
+     • "Failed"  = current `Failed - Initial` | `Failed - Develop/Deployment` (+ legacy `Failed`)
+   `match` lists every current status that falls in the bucket. `token` is the
+   bucket's color; `ready` flags the positive/ready (non-alarm) deploy bucket. */
+const DASH_BUCKETS = [
+  { key:'Not Tested',       label:'Not Tested',                         token:'--st-nottested',      match:['Not Tested'] },
+  { key:'In Progress',      label:'In Progress',                        token:'--st-inprogress',     match:['In Progress'] },
+  { key:'deploy',           label:'For possible deployment to develop', token:'--st-passed-initial', match:['Passed - Initial'], ready:true },
+  { key:'Passed',           label:'Passed',                             token:'--st-passed',         match:['Passed - Develop/Deployment','Passed'] },
+  { key:'Failed',           label:'Failed',                             token:'--st-failed',         match:['Failed - Initial','Failed - Develop/Deployment','Failed'] },
+  { key:'Needs Monitoring', label:'Needs Monitoring',                   token:'--st-monitoring',     match:['Needs Monitoring'] },
+  { key:'Urgent/High Prio', label:'Urgent/High Prio',                   token:'--st-urgent',         match:['Urgent/High Prio'] },
+  { key:'Blocked',          label:'Blocked',                            token:'--st-blocked',        match:['Blocked'] }
+];
+/* The set of current statuses treated as "failed" (new stage variants + legacy). */
+const FAILED_STATUSES = ['Failed - Initial','Failed - Develop/Deployment','Failed'];
+function isFailedStatus(s){ return FAILED_STATUSES.indexOf(s) !== -1; }
+/* The dashboard-bucket key a current status belongs to (falls back to the status
+   itself so an exact-status filter still works). */
+function bucketKeyOf(status){
+  const b = DASH_BUCKETS.find(x => x.match.indexOf(status) !== -1);
+  return b ? b.key : status;
+}
+
 function renderDashboard(){
   const d = state.derived;
-  const counts = statusCounts(d);
   const total = d.length;
   const sampleNote = store.mode === 'demo'
     ? `<span class="sample-note">◐ Sample data — not your team's real figures</span>` : '';
 
-  const tiles = [{key:'__all', label:'Total AXOs', token:'--brand-2', val:total}]
-    .concat(STATUSES.map(s => ({ key:s.key, label:s.key, token:s.token, val:counts[s.key]||0 })))
-    .map(t => `
-      <button class="tile" style="--tc:var(${t.token})" data-filter="${t.key==='__all'?'all':esc(t.key)}" title="View in AXO Tracker">
-        <span class="t-val">${t.val}</span>
-        <span class="t-lab">${t.key==='__all'?'':'<span class="sdot"></span>'}${esc(t.label)}</span>
-      </button>`).join('');
+  const bucketCount = b => d.filter(a => b.match.indexOf(a.current) !== -1).length;
+  const tiles = [`
+      <button class="tile" style="--tc:var(--brand-2)" data-filter="all" title="View in AXO Tracker">
+        <span class="t-val">${total}</span>
+        <span class="t-lab">Total AXOs</span>
+      </button>`]
+    .concat(DASH_BUCKETS.map(b => `
+      <button class="tile" style="--tc:var(${b.token})" data-filter="${esc(b.key)}" title="View in AXO Tracker">
+        <span class="t-val">${bucketCount(b)}</span>
+        <span class="t-lab"><span class="sdot"></span>${esc(b.label)}</span>
+      </button>`)).join('');
 
-  const attn = [
-    { label:'Blocked', status:'Blocked', token:'--st-blocked' },
-    { label:'Urgent / High Prio', status:'Urgent/High Prio', token:'--st-urgent' },
-    { label:'Needs Monitoring', status:'Needs Monitoring', token:'--st-monitoring' },
-    { label:'Not Tested', status:'Not Tested', token:'--st-nottested' }
-  ].map(col => {
-    const items = d.filter(a => a.current === col.status);
+  /* Attention panels. Each panel lists AXOs by CURRENT status. The Needs
+     Monitoring panel is the UNION of current Needs Monitoring and every failed
+     variant, with each row's real status pill shown (the Needs Monitoring TILE
+     above still counts only the Needs Monitoring status). The deploy panel is a
+     positive/ready panel (teal), not an alarm. */
+  const panels = [
+    { label:'Blockers',            token:'--st-blocked',        match:a => a.current === 'Blocked' },
+    { label:'Urgent / High Prio',  token:'--st-urgent',         match:a => a.current === 'Urgent/High Prio' },
+    { label:'Needs Monitoring',    token:'--st-monitoring',     match:a => a.current === 'Needs Monitoring' || isFailedStatus(a.current), note:'includes failed', pills:true },
+    { label:'Not Tested',          token:'--st-nottested',      match:a => a.current === 'Not Tested' },
+    { label:'For possible deployment to develop', token:'--st-passed-initial', match:a => a.current === 'Passed - Initial', ready:true }
+  ];
+  const attn = panels.map(col => {
+    const items = d.filter(col.match);
     const body = items.length
       ? `<ul>${items.map(a => `
           <li><button data-goto="${esc(a.axo)}">
-            <span class="axo-no">AXO ${esc(a.axo)}</span>
+            <span class="axo-top"><span class="axo-no">AXO ${esc(a.axo)}</span>${col.pills ? statusPill(a.current) : ''}</span>
             <span class="nt">${esc(a.history[a.history.length-1].note) || '—'}</span>
           </button></li>`).join('')}</ul>`
-      : `<div class="empty">Nothing here — all clear.</div>`;
-    return `<div class="attn" style="--ac:var(${col.token})">
+      : `<div class="empty">${col.ready ? 'Nothing ready yet.' : 'Nothing here — all clear.'}</div>`;
+    return `<div class="attn${col.ready ? ' ready' : ''}" style="--ac:var(${col.token})">
         <h3><span class="sdot"></span>${esc(col.label)}<span class="cnt">${items.length}</span></h3>
+        ${col.note ? `<p class="attn-note">${esc(col.note)}</p>` : ''}
         ${body}
       </div>`;
   }).join('');
@@ -1722,15 +1787,18 @@ function gotoAxo(axo){
    AXO TRACKER
    ============================================================ */
 function renderTracker(){
-  const statusOptions = ['all'].concat(STATUSES.map(s => s.key))
-    .map(s => `<option value="${esc(s)}"${state.statusFilter===s?' selected':''}>${s==='all'?'All statuses':esc(s)}</option>`).join('');
+  /* Filter by dashboard bucket so the tiles and this dropdown agree (Passed =
+     final + legacy, Failed = both variants + legacy, "deploy" = Passed - Initial). */
+  const statusOptions = [{ key:'all', label:'All statuses' }]
+    .concat(DASH_BUCKETS.map(b => ({ key:b.key, label:b.label })))
+    .map(o => `<option value="${esc(o.key)}"${state.statusFilter===o.key?' selected':''}>${esc(o.label)}</option>`).join('');
 
   let rows = state.derived.slice();
   const q = state.search.trim().toLowerCase();
   if (q) rows = rows.filter(a => a.axo.toLowerCase().includes(q)
       || a.lastQA.toLowerCase().includes(q)
       || a.history.some(h => (h.note||'').toLowerCase().includes(q)));
-  if (state.statusFilter !== 'all') rows = rows.filter(a => a.current === state.statusFilter);
+  if (state.statusFilter !== 'all') rows = rows.filter(a => bucketKeyOf(a.current) === state.statusFilter);
 
   const dir = state.sortDir === 'asc' ? 1 : -1;
   rows.sort((a, b) => {
@@ -2078,22 +2146,43 @@ function lsSet(key, val){ try { localStorage.setItem(key, val); } catch (e){} }
 
 function sectionByKey(key){ return SECTIONS.find(s => s.key === key) || {}; }
 
-/* Status dropdown, grouped so the routing is legible: the three results logged
-   while working this shift first (all file under "Worked On"), then the statuses
-   that each hand an AXO off to its own follow-up section. Option labels are the
-   canonical status pill labels (STATUSES[].key) verbatim, so a row's dropdown and
-   its pill never diverge — only the ORDER and the optgroup HEADINGS are set here.
-   The underlying stored VALUES are unchanged. */
+/* Status dropdown, grouped so the routing is legible: In Progress (the live
+   default) first, then the two staged outcomes — Passed and Failed each split
+   into an Initial and a Develop/Deployment stage — then the follow-up statuses
+   that hand an AXO off to its own section. Each option's stored VALUE is the full
+   canonical status (e.g. "Passed - Initial") so a row's dropdown and its pill
+   never diverge; under the Passed/Failed optgroups the visible text is just the
+   stage ("Initial" / "Develop/Deployment") since the group heading says Passed or
+   Failed. The flat legacy "Passed"/"Failed" are NOT offered here (see below). */
 const STATUS_GROUPS = [
-  { label:'Worked on this shift', statuses:['In Progress','Passed','Failed'] },
-  { label:'Needs follow-up',      statuses:['Needs Monitoring','Not Tested','Urgent/High Prio','Blocked'] }
+  { label:'Worked on this shift', options:[ { value:'In Progress' } ] },
+  { label:'Passed', options:[
+      { value:'Passed - Initial',            text:'Initial' },
+      { value:'Passed - Develop/Deployment', text:'Develop/Deployment' }
+  ] },
+  { label:'Failed', options:[
+      { value:'Failed - Initial',            text:'Initial' },
+      { value:'Failed - Develop/Deployment', text:'Develop/Deployment' }
+  ] },
+  { label:'Needs follow-up', options:[
+      { value:'Needs Monitoring' }, { value:'Not Tested' },
+      { value:'Urgent/High Prio' }, { value:'Blocked' }
+  ] }
 ];
 function statusOptionsHtml(selected){
-  return STATUS_GROUPS.map(g =>
+  const groups = STATUS_GROUPS.map(g =>
     `<optgroup label="${esc(g.label)}">` +
-    g.statuses.map(k => `<option value="${esc(k)}"${k===selected?' selected':''}>${esc(k)}</option>`).join('') +
+    g.options.map(o => `<option value="${esc(o.value)}"${o.value===selected?' selected':''}>${esc(o.text || o.value)}</option>`).join('') +
     `</optgroup>`
-  ).join('');
+  );
+  /* Backward compatibility: a legacy "Passed"/"Failed" (or any other unknown
+     stored value) on an edited row is kept selectable so editing never silently
+     loses it — shown in its own group, but never offered for new rows. */
+  const known = STATUS_GROUPS.some(g => g.options.some(o => o.value === selected));
+  const legacy = (selected && !known)
+    ? `<optgroup label="Current (legacy)"><option value="${esc(selected)}" selected>${esc(selected)}</option></optgroup>`
+    : '';
+  return legacy + groups.join('');
 }
 
 function readHeader(){

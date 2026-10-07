@@ -396,13 +396,18 @@ function setupShiftReminders() {
    (Keep these in sync with the client's PURE LOGIC block.)
    ============================================================ */
 var STATUSES = [
-  { key:'Not Tested',        token:'--st-nottested',  glyph:'○' },
-  { key:'In Progress',       token:'--st-inprogress', glyph:'◐' },
-  { key:'Needs Monitoring',  token:'--st-monitoring', glyph:'◉' },
-  { key:'Urgent/High Prio',  token:'--st-urgent',     glyph:'▲' },
-  { key:'Blocked',           token:'--st-blocked',    glyph:'■' },
-  { key:'Failed',            token:'--st-failed',     glyph:'✕' },
-  { key:'Passed',            token:'--st-passed',     glyph:'✓' }
+  { key:'Not Tested',                   token:'--st-nottested',      glyph:'○' },
+  { key:'In Progress',                  token:'--st-inprogress',     glyph:'◐' },
+  { key:'Passed - Initial',             token:'--st-passed-initial', glyph:'↗' },
+  { key:'Passed - Develop/Deployment',  token:'--st-passed',         glyph:'✓' },
+  { key:'Failed - Initial',             token:'--st-failed',         glyph:'✕' },
+  { key:'Failed - Develop/Deployment',  token:'--st-failed',         glyph:'✕' },
+  { key:'Needs Monitoring',             token:'--st-monitoring',     glyph:'◉' },
+  { key:'Urgent/High Prio',             token:'--st-urgent',         glyph:'▲' },
+  { key:'Blocked',                      token:'--st-blocked',        glyph:'■' },
+  /* Legacy values — still RECOGNIZED but no longer offered in the entry builder. */
+  { key:'Failed',                       token:'--st-failed',         glyph:'✕', legacy:true },
+  { key:'Passed',                       token:'--st-passed',         glyph:'✓', legacy:true }
 ];
 
 var SECTIONS = [
@@ -443,13 +448,17 @@ function defaultStatusFor(sectionKey){
 var AXO_SECTION_KEYS = SECTIONS.filter(function(s){ return s.axo; }).map(function(s){ return s.key; });
 
 var STATUS_SECTION = {
-  'Not Tested':       'notTested',
-  'In Progress':      'workedOn',
-  'Passed':           'workedOn',
-  'Failed':           'workedOn',
-  'Needs Monitoring': 'needsMonitoring',
-  'Urgent/High Prio': 'urgent',
-  'Blocked':          'blocker'
+  'Not Tested':                  'notTested',
+  'In Progress':                 'workedOn',
+  'Passed - Initial':            'workedOn',
+  'Passed - Develop/Deployment': 'workedOn',
+  'Failed - Initial':            'workedOn',
+  'Failed - Develop/Deployment': 'workedOn',
+  'Passed':                      'workedOn',  // legacy
+  'Failed':                      'workedOn',  // legacy
+  'Needs Monitoring':            'needsMonitoring',
+  'Urgent/High Prio':            'urgent',
+  'Blocked':                     'blocker'
 };
 function sectionForStatus(status){
   return STATUS_SECTION[status] || 'workedOn';
