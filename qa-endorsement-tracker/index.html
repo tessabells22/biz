@@ -395,6 +395,54 @@
   .sec-lines li .lnote{color:var(--muted);font-size:12px}
   .sec-empty{font-size:12px;color:var(--muted);font-style:italic}
 
+  /* ---------- Shift log: toolbar + filters ---------- */
+  .log-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .log-filters{display:flex;gap:8px;flex-wrap:wrap;flex:1 1 320px;min-width:0}
+  .log-search{flex:1 1 200px;min-width:0;padding:8px 11px;font-size:13px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--fg)}
+  .log-select{padding:8px 10px;font-size:12.5px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--fg)}
+  .log-expand-controls{display:flex;gap:7px;flex:none}
+  .log-expand-controls button{padding:7px 11px;font-size:12px}
+  @media(max-width:560px){.log-expand-controls{width:100%}.log-expand-controls button{flex:1}}
+
+  /* ---------- Shift log: date groups ---------- */
+  .log-group{margin-bottom:18px}
+  .log-group:last-child{margin-bottom:0}
+  .log-group-head{display:flex;align-items:baseline;gap:10px;padding:0 2px 8px;position:sticky;top:env(safe-area-inset-top,0px);z-index:2;background:var(--plane)}
+  .log-group-head .lg-date{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-2);font-variant-numeric:tabular-nums}
+  .log-group-head .lg-count{font-size:11px;color:var(--muted);font-weight:600}
+  .log-rows{display:flex;flex-direction:column;gap:8px}
+
+  /* ---------- Shift log: compact rows ---------- */
+  .endo-row{border:1px solid var(--border);border-radius:11px;background:var(--surface);overflow:hidden}
+  .endo-row.open{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));box-shadow:var(--shadow)}
+  .er-summary{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:11px 14px;background:none;border:0;cursor:pointer;color:inherit;font:inherit;min-width:0}
+  .er-summary:hover{background:var(--surface-2)}
+  .er-summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .er-caret{flex:none;color:var(--muted);font-size:11px;transition:transform .15s ease}
+  .endo-row.open .er-caret{transform:rotate(90deg)}
+  .er-badge{flex:none;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:var(--sb-bg,var(--surface-2));color:var(--sb-fg,var(--fg-2));border:1px solid color-mix(in srgb,var(--sb-fg,var(--muted)) 26%,var(--border))}
+  .er-badge.shift-Day{--sb-bg:color-mix(in srgb,var(--st-passed) 15%,transparent);--sb-fg:var(--st-passed)}
+  .er-badge.shift-Mid{--sb-bg:color-mix(in srgb,var(--st-urgent) 15%,transparent);--sb-fg:var(--st-urgent)}
+  .er-badge.shift-Night{--sb-bg:color-mix(in srgb,var(--brand-2-ink) 16%,transparent);--sb-fg:var(--brand-2-ink)}
+  .er-name{flex:none;font-size:13.5px;font-weight:650;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40%}
+  .er-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto;justify-content:flex-end;min-width:0}
+  .cchip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--sc,var(--fg-2));background:color-mix(in srgb,var(--sc,var(--muted)) 13%,transparent);border:1px solid color-mix(in srgb,var(--sc,var(--muted)) 32%,transparent)}
+  .cchip b{font-weight:800;font-variant-numeric:tabular-nums}
+  .cchip.file{color:var(--brand-2-ink);background:var(--surface-2);border-color:var(--border)}
+  .cchip.muted{color:var(--muted);background:var(--surface-2);border-color:var(--border);font-style:italic}
+  @media(max-width:560px){
+    .er-summary{flex-wrap:wrap}
+    .er-name{max-width:none;flex:1 1 auto}
+    .er-chips{margin-left:0;width:100%;justify-content:flex-start;margin-top:2px}
+  }
+  .endo-detail{border-top:1px solid var(--border);background:var(--surface-2)}
+  .endo-detail .endo-body{padding:4px 16px 8px}
+  .endo-detail-actions{display:flex;gap:7px;justify-content:flex-end;padding:0 16px 14px}
+  .endo-detail-actions button{padding:5px 10px;font-size:12px}
+  .log-loadmore{display:flex;justify-content:center;margin-top:16px}
+  .log-loadmore button{padding:9px 18px;font-size:12.5px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
   /* ---------- Form ---------- */
   .form-head{
     display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
@@ -1487,7 +1535,8 @@ const state = {
   statusFilter: 'all',
   expanded: new Set(),
   editingId: null,
-  draft: { rows: [], nonAxo: [], fileRefs: [] }
+  draft: { rows: [], nonAxo: [], fileRefs: [] },
+  log: { window: 12, text: '', shift: 'All', qa: 'All', expanded: new Set() }
 };
 
 const $ = sel => document.querySelector(sel);
@@ -1522,6 +1571,17 @@ function fmtDate(d){
   if (parts.length !== 3) return d;
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return `${months[parseInt(parts[1],10)-1]} ${parseInt(parts[2],10)}`;
+}
+/* Full date-group label for the Shift Log, e.g. "Mon · Sep 30, 2025". */
+function fmtDateFull(d){
+  if (!d) return '';
+  const p = d.split('-');
+  if (p.length !== 3) return d;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const y = parseInt(p[0],10), mo = parseInt(p[1],10), da = parseInt(p[2],10);
+  const wd = days[new Date(y, mo-1, da).getDay()];
+  return `${wd} · ${months[mo-1]} ${da}, ${y}`;
 }
 
 function recompute(){ state.derived = deriveAxos(state.endorsements); }
@@ -1751,9 +1811,107 @@ function sortedEndorsements(){
   });
 }
 
+/* Section → compact summary chip: a short label plus the status color that the
+   section files AXOs under. nonAxo carries no AXO status, so it gets the neutral
+   brand ink. The counts come straight from the stored section arrays, so the
+   data model, derivation and Slack output are untouched. */
+const LOG_CHIP_META = {
+  workedOn:        { label:'Worked On',  token:'--st-inprogress' },
+  needsMonitoring: { label:'Monitoring', token:'--st-monitoring' },
+  blocker:         { label:'Blocked',    token:'--st-blocked' },
+  urgent:          { label:'Urgent',     token:'--st-urgent' },
+  notTested:       { label:'Not Tested', token:'--st-nottested' },
+  nonAxo:          { label:'Other',      token:'--brand-2-ink' }
+};
+const LOG_PAGE = 12;
+
+/* Build the full six-section detail body for one endorsement — the exact markup
+   the Shift Log used to render inline, reused when a compact row expands. Keeps
+   the existing Edit and Delete actions. */
+function endoDetailHtml(e){
+  const secs = orderedBlocks().map(b => {
+    if (b.type === 'file'){
+      const refs = fileRefsOf(e);
+      const inner = refs.length
+        ? `<ul class="sec-lines">${refs.map(fileRefLineHtml).join('')}</ul>`
+        : `<div class="sec-empty">— none —</div>`;
+      return `<div class="sec-block">
+          <div class="sec-title"><span class="n">${b.field.num}.</span>${esc(b.field.title)}</div>${inner}</div>`;
+    }
+    const s = b.section;
+    const rows = (e.sections && e.sections[s.key]) || [];
+    let inner;
+    if (!rows.length){
+      inner = `<div class="sec-empty">— none —</div>`;
+    } else if (s.axo){
+      inner = `<ul class="sec-lines">${rows.map(r => `
+          <li><span class="lx">•</span><span class="la">${esc(r.axo)}</span>
+            <span class="ln">${esc(r.note)||'—'}</span>
+            <span class="lst">${statusPill(r.status||defaultStatusFor(s.key))}</span></li>`).join('')}</ul>`;
+    } else {
+      inner = `<ul class="sec-lines">${rows.map(r => `
+          <li><span class="lx">•</span><span class="ln">${esc(r.note)||'—'}</span></li>`).join('')}</ul>`;
+    }
+    return `<div class="sec-block">
+        <div class="sec-title"><span class="n">${s.num}.</span>${esc(s.title)}</div>${inner}</div>`;
+  }).join('');
+  return `<div class="endo-body">${secs}</div>
+      <div class="endo-detail-actions">
+        <button class="iconbtn" data-edit="${esc(e.id)}">Edit</button>
+        <button class="iconbtn danger" data-del="${esc(e.id)}">Delete</button>
+      </div>`;
+}
+
+/* Compact summary chips for one endorsement: one chip per non-empty section
+   (count + label, colored by the section's status), plus a file count. */
+function endoChipsHtml(e){
+  const chips = SECTIONS.map(s => {
+    const rows = (e.sections && e.sections[s.key]) || [];
+    if (!rows.length) return '';
+    const m = LOG_CHIP_META[s.key] || { label: s.key, token: '--muted' };
+    return `<span class="cchip" style="--sc:var(${m.token})"><b>${rows.length}</b> ${esc(m.label)}</span>`;
+  }).filter(Boolean);
+  const refs = fileRefsOf(e);
+  const fileChip = refs.length
+    ? `<span class="cchip file" title="${refs.length} file${refs.length>1?'s':''} attached"><span aria-hidden="true">📎</span> ${refs.length}<span class="sr-only"> file${refs.length>1?'s':''} attached</span></span>`
+    : '';
+  const none = (!chips.length && !fileChip) ? `<span class="cchip muted">No items</span>` : '';
+  return chips.join('') + fileChip + none;
+}
+
+/* Does an endorsement match the active light filter? Text matches AXO numbers
+   and note text across every section (plus the QA name); shift and QA are exact. */
+function endoMatchesFilter(e, f){
+  if (f.shift && f.shift !== 'All' && e.shift !== f.shift) return false;
+  if (f.qa && f.qa !== 'All' && (e.qaResource || '') !== f.qa) return false;
+  const q = (f.text || '').trim().toLowerCase();
+  if (!q) return true;
+  const hay = [];
+  SECTIONS.forEach(s => ((e.sections && e.sections[s.key]) || []).forEach(r => {
+    if (r.axo) hay.push(String(r.axo));
+    if (r.note) hay.push(r.note);
+  }));
+  if (e.qaResource) hay.push(e.qaResource);
+  return hay.join(' \n ').toLowerCase().includes(q);
+}
+
+/* The currently-loaded, filtered window of endorsements, in sorted order. */
+function logVisibleList(){
+  const f = state.log;
+  const filtered = sortedEndorsements().filter(e => endoMatchesFilter(e, f));
+  return { filtered, visible: filtered.slice(0, f.window) };
+}
+
+function logSetAllExpanded(on){
+  const { visible } = logVisibleList();
+  if (on) visible.forEach(e => state.log.expanded.add(String(e.id)));
+  else state.log.expanded.clear();
+  renderLogList();
+}
+
 function renderLog(){
-  const list = sortedEndorsements();
-  if (!list.length){
+  const all = sortedEndorsements();
+  if (!all.length){
     $('#view-log').innerHTML = `<div class="section-head"><h2>Shift Log</h2></div>` +
       emptyState('No endorsements yet', 'Log the first shift handover to start building AXO history.', '📋',
         '<button class="iconbtn primary" id="logNew">+ New Endorsement</button>');
@@ -1761,56 +1919,115 @@ function renderLog(){
     return;
   }
 
-  const cards = list.map(e => {
-    const secs = orderedBlocks().map(b => {
-      if (b.type === 'file'){
-        const refs = fileRefsOf(e);
-        const inner = refs.length
-          ? `<ul class="sec-lines">${refs.map(fileRefLineHtml).join('')}</ul>`
-          : `<div class="sec-empty">— none —</div>`;
-        return `<div class="sec-block">
-            <div class="sec-title"><span class="n">${b.field.num}.</span>${esc(b.field.title)}</div>${inner}</div>`;
-      }
-      const s = b.section;
-      const rows = (e.sections && e.sections[s.key]) || [];
-      let inner;
-      if (!rows.length){
-        inner = `<div class="sec-empty">— none —</div>`;
-      } else if (s.axo){
-        inner = `<ul class="sec-lines">${rows.map(r => `
-            <li><span class="lx">•</span><span class="la">${esc(r.axo)}</span>
-              <span class="ln">${esc(r.note)||'—'}</span>
-              <span class="lst">${statusPill(r.status||defaultStatusFor(s.key))}</span></li>`).join('')}</ul>`;
-      } else {
-        inner = `<ul class="sec-lines">${rows.map(r => `
-            <li><span class="lx">•</span><span class="ln">${esc(r.note)||'—'}</span></li>`).join('')}</ul>`;
-      }
-      return `<div class="sec-block">
-          <div class="sec-title"><span class="n">${s.num}.</span>${esc(s.title)}</div>${inner}</div>`;
-    }).join('');
+  // Fresh entry to the tab resets the window + filter; rows start collapsed.
+  state.log = { window: LOG_PAGE, text: '', shift: 'All', qa: 'All', expanded: new Set() };
 
-    return `<article class="card endo">
-        <div class="endo-head">
-          <span class="e-title">${esc(fmtDate(e.shiftDate))}, ${esc(e.shiftDate)}</span>
-          <span class="e-meta">
-            <span class="chip">${esc(e.shift)} shift</span>
-            <span class="chip">QA: ${esc(e.qaResource)||'—'}</span>
-          </span>
-          <span class="e-actions">
-            <button class="iconbtn" data-edit="${esc(e.id)}">Edit</button>
-            <button class="iconbtn danger" data-del="${esc(e.id)}">Delete</button>
-          </span>
-        </div>
-        <div class="endo-body">${secs}</div>
-      </article>`;
-  }).join('');
+  const knownQA = Array.from(new Set(all.map(e => e.qaResource).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b));
+  const qaOpts = ['All', ...knownQA].map(n =>
+    `<option value="${esc(n)}">${n === 'All' ? 'All QA Resources' : esc(n)}</option>`).join('');
+  const shiftOpts = ['All','Day','Mid','Night'].map(s =>
+    `<option value="${esc(s)}">${s === 'All' ? 'All shifts' : esc(s) + ' shift'}</option>`).join('');
 
   $('#view-log').innerHTML = `
-    <div class="section-head"><h2>Shift Log</h2><span class="hint">Every handover in the Endorsement of Tasks format, newest first.</span></div>
-    <div class="log-list">${cards}</div>`;
+    <div class="section-head"><h2>Shift Log</h2><span class="hint">Shift handovers grouped by date, newest first. Open a row for the full endorsement.</span></div>
+    <div class="log-toolbar">
+      <div class="log-filters">
+        <input type="search" id="logSearch" class="log-search" placeholder="Filter by AXO # or note…" aria-label="Filter by AXO number or note text">
+        <select id="logShift" class="log-select" aria-label="Filter by shift">${shiftOpts}</select>
+        <select id="logQA" class="log-select" aria-label="Filter by QA Resource">${qaOpts}</select>
+      </div>
+      <div class="log-expand-controls">
+        <button type="button" class="iconbtn" id="logExpandAll">Expand all</button>
+        <button type="button" class="iconbtn" id="logCollapseAll">Collapse all</button>
+      </div>
+    </div>
+    <div id="logListHost"></div>`;
 
-  $$('#view-log [data-edit]').forEach(b => b.addEventListener('click', () => openForm(b.dataset.edit)));
-  $$('#view-log [data-del]').forEach(b => b.addEventListener('click', () => doDelete(b.dataset.del)));
+  const search = $('#logSearch'), shiftSel = $('#logShift'), qaSel = $('#logQA');
+  search.addEventListener('input', () => { state.log.text = search.value; state.log.window = LOG_PAGE; renderLogList(); });
+  shiftSel.addEventListener('change', () => { state.log.shift = shiftSel.value; state.log.window = LOG_PAGE; renderLogList(); });
+  qaSel.addEventListener('change', () => { state.log.qa = qaSel.value; state.log.window = LOG_PAGE; renderLogList(); });
+  $('#logExpandAll').addEventListener('click', () => logSetAllExpanded(true));
+  $('#logCollapseAll').addEventListener('click', () => logSetAllExpanded(false));
+
+  // Delegated Edit/Delete on the list host (a fresh element each full render, so
+  // listeners never accumulate) — works for detail built lazily on expand.
+  $('#logListHost').addEventListener('click', ev => {
+    const ed = ev.target.closest('[data-edit]'); if (ed){ openForm(ed.dataset.edit); return; }
+    const dl = ev.target.closest('[data-del]'); if (dl){ doDelete(dl.dataset.del); return; }
+  });
+
+  renderLogList();
+}
+
+function renderLogList(){
+  const host = $('#logListHost');
+  if (!host) return;
+  const { filtered, visible } = logVisibleList();
+
+  if (!filtered.length){
+    host.innerHTML = emptyState('No matching shifts',
+      'No endorsements match the current filter. Clear the search or pick a different shift or QA Resource.', '🔍', '');
+    return;
+  }
+
+  // Group the visible window by date (list is already date-descending).
+  const groups = [];
+  visible.forEach(e => {
+    const last = groups[groups.length - 1];
+    if (last && last.date === e.shiftDate) last.items.push(e);
+    else groups.push({ date: e.shiftDate, items: [e] });
+  });
+
+  const groupsHtml = groups.map(g => {
+    const rows = g.items.map(e => {
+      const id = String(e.id);
+      const open = state.log.expanded.has(id);
+      return `<div class="endo-row${open ? ' open' : ''}" data-id="${esc(id)}">
+          <button type="button" class="er-summary" aria-expanded="${open}" aria-controls="det-${esc(id)}">
+            <span class="er-caret" aria-hidden="true">▸</span>
+            <span class="er-badge shift-${esc(e.shift)}">${esc(e.shift)}</span>
+            <span class="er-name">${esc(e.qaResource) || '—'}</span>
+            <span class="er-chips">${endoChipsHtml(e)}</span>
+          </button>
+          <div class="endo-detail" id="det-${esc(id)}"${open ? '' : ' hidden'}>${open ? endoDetailHtml(e) : ''}</div>
+        </div>`;
+    }).join('');
+    return `<section class="log-group">
+        <div class="log-group-head"><span class="lg-date">${esc(fmtDateFull(g.date))}</span><span class="lg-count">${g.items.length} shift${g.items.length>1?'s':''}</span></div>
+        <div class="log-rows">${rows}</div>
+      </section>`;
+  }).join('');
+
+  const more = filtered.length > visible.length
+    ? `<div class="log-loadmore"><button type="button" class="iconbtn" id="logLoadOlder">Load older (${filtered.length - visible.length} more)</button></div>`
+    : '';
+
+  host.innerHTML = groupsHtml + more;
+
+  // Row expand/collapse — build the detail DOM lazily on first open.
+  $$('#logListHost .er-summary').forEach(btn => btn.addEventListener('click', () => {
+    const row = btn.closest('.endo-row');
+    const id = row.dataset.id;
+    const det = row.querySelector('.endo-detail');
+    const willOpen = !state.log.expanded.has(id);
+    if (willOpen){
+      state.log.expanded.add(id);
+      if (!det.firstChild){
+        const e = state.endorsements.find(x => String(x.id) === id);
+        if (e) det.innerHTML = endoDetailHtml(e);
+      }
+      det.hidden = false; row.classList.add('open');
+    } else {
+      state.log.expanded.delete(id);
+      det.hidden = true; row.classList.remove('open');
+    }
+    btn.setAttribute('aria-expanded', String(willOpen));
+  }));
+
+  const older = $('#logLoadOlder');
+  if (older) older.addEventListener('click', () => { state.log.window += LOG_PAGE; renderLogList(); });
 }
 
 async function doDelete(id){
