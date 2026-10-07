@@ -309,7 +309,27 @@ toast). Demo (local) mode skips the mirror entirely.
 
 Then build the scheduled flow:
 
-1. Trigger: **Recurrence** — e.g. daily, or at each shift start.
+1. Trigger: **Recurrence** — fire it at the **start of each shift** so the incoming
+   team sees the current Urgent / High Prio AXOs. There are three shifts a day; all
+   times are **PHT** (Philippine Time, UTC+8, no daylight saving):
+
+   | Shift | PHT start | UTC |
+   |---|---|---|
+   | Day | 5:00 AM | 21:00 (previous day) |
+   | Mid | 1:00 PM | 05:00 |
+   | Night | 10:00 PM | 14:00 |
+
+   This is **one Recurrence trigger, not three flows** — a single daily recurrence with
+   three `At these hours` values covers all three shift starts. Configure it either way:
+
+   - **Preferred** — set the trigger **Time Zone** to a UTC+08:00 zone (e.g.
+     `(UTC+08:00) Kuala Lumpur, Singapore` — the Philippines observes no DST),
+     **Frequency** = `Day`, **Interval** = `1`, **At these hours** = `5, 13, 22`,
+     **At these minutes** = `0`.
+   - **Equivalent in UTC** (if the Time Zone is left at the default UTC) —
+     **At these hours** = `21, 5, 14`, **At these minutes** = `0` (Day 5:00 AM PHT =
+     21:00 UTC the previous day, Mid 1:00 PM PHT = 05:00 UTC, Night 10:00 PM PHT =
+     14:00 UTC).
 2. Action: **Get items** from **`QAAxoStatus`** with the OData filter
 
    ```
