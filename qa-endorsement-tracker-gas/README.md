@@ -45,7 +45,8 @@ Open **Project Settings &rsaquo; Script Properties &rsaquo; Add script property*
 | Property | Value | Required |
 |---|---|---|
 | `SLACK_WEBHOOK_URL` | your Slack **Incoming Webhook** URL | Required for Slack posts |
-| `REMIND_INCLUDE_BLOCKED` | `true` to also remind about **Blocked** AXOs | Optional |
+| `REMIND_INCLUDE_BLOCKED` | `true` to also remind about **Blocked** AXOs | Optional (default `false`) |
+| `REMIND_WHEN_EMPTY` | `false` to stay silent when nothing is open; otherwise the reminder posts a short **all-clear** heartbeat | Optional (**default `true`**) |
 | `DRIVE_FOLDER_ID` | — | Auto-managed; leave unset |
 
 **Make a Slack Incoming Webhook:** Slack &rsaquo; *Your apps* &rsaquo; create/select an
@@ -79,7 +80,9 @@ To tighten or loosen access later, edit the manifest's `webapp.access`
 In the editor, select the function **`setupShiftReminders`** and **Run** it **once**
 (authorize if prompted). It installs three native daily time-triggers that post a
 start-of-shift reminder of any open **Urgent/High Prio** AXOs (plus **Blocked** when
-`REMIND_INCLUDE_BLOCKED=true`). If none are open, it stays quiet (no spam).
+`REMIND_INCLUDE_BLOCKED=true`). If none are open it posts a short **all-clear**
+heartbeat so a quiet shift still confirms the schedule is working — set
+`REMIND_WHEN_EMPTY=false` if you'd rather it stay silent on an empty shift.
 
 The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT**:
 
@@ -92,6 +95,13 @@ The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT
 > Apps Script time-triggers fire within the given hour (not exactly on the minute).
 > Re-running `setupShiftReminders` is safe — it deletes existing `sendUrgentReminder`
 > triggers first, then recreates the three.
+>
+> Time-triggers always run the **latest saved** project code, so editing `Code.gs`
+> or changing a Script Property takes effect immediately — **no redeploy** and no
+> re-run of `setupShiftReminders` needed. Only re-run it if the three triggers are
+> missing (check **Triggers** in the editor sidebar). Each run writes diagnostics
+> (open counts, whether the webhook is set, the Slack response code) to the
+> **Executions** tab.
 
 ## 6. Access & security notes
 

@@ -12,13 +12,19 @@
      • Reminders      — native time triggers at each shift start
 
    Config lives in Script Properties (Project Settings), never in
-   source: SLACK_WEBHOOK_URL (required for posting), optional
-   REMIND_INCLUDE_BLOCKED ('true'/'false'), DRIVE_FOLDER_ID
-   (auto-managed). See README.md.
+   source:
+     • SLACK_WEBHOOK_URL     — required for posting (Slack Incoming Webhook URL)
+     • REMIND_INCLUDE_BLOCKED — 'true'/'false' (default false): also treat
+       Blocked AXOs as open in the shift reminder.
+     • REMIND_WHEN_EMPTY     — 'true'/'false' (DEFAULT TRUE): post a short
+       all-clear heartbeat when no Urgent/High Prio (or Blocked) AXOs are open.
+       Set to 'false' to stay silent on an empty shift.
+     • DRIVE_FOLDER_ID       — auto-managed.
+   See README.md.
    ============================================================ */
 
 /* ---------- constants ---------- */
-var BUILD = '2026-10-08.1'; // kept in step with the clients' BUILD stamp
+var BUILD = '2026-10-08.2'; // kept in step with the clients' BUILD stamp
 var SHEET_NAME = 'Endorsements';
 var HEADERS = ['Id', 'ShiftDate', 'Shift', 'QAResource', 'Payload', 'CreatedAt', 'UpdatedAt'];
 var DRIVE_FOLDER_NAME = 'NPD QA Test Files';
@@ -354,18 +360,23 @@ function setConfig(webhookUrl) {
    ============================================================ */
 
 /* Post plain text to the configured Slack Incoming Webhook. No-op (logs) when no
-   webhook is configured. NEVER throws — a failed post must not fail the save. */
+   webhook is configured. NEVER throws — a failed post must not fail the save.
+   Logs the HTTP response code to the Executions tab and returns it (a truthy
+   number, e.g. 200) on a completed POST, or false when skipped/errored. */
 function postToSlack_(text) {
   try {
     var url = getProp_('SLACK_WEBHOOK_URL');
-    if (!url) { Logger.log('SLACK_WEBHOOK_URL not set — skipping Slack post.'); return false; }
-    UrlFetchApp.fetch(url, {
+    if (!url) { Logger.log('Slack: SLACK_WEBHOOK_URL not set — skipping Slack post.'); return false; }
+    var res = UrlFetchApp.fetch(url, {
       method: 'post',
       contentType: 'application/json',
       payload: JSON.stringify({ text: text || '' }),
       muteHttpExceptions: true
     });
-    return true;
+    var code = res.getResponseCode();
+    Logger.log('Slack: POST response code ' + code +
+      (code === 200 ? ' (ok)' : ' — ' + res.getContentText()));
+    return code;
   } catch (e) {
     Logger.log('postToSlack_ failed: ' + e);
     return false;
@@ -382,42 +393,94 @@ function sendNewEndorsementAlert_(model) {
 }
 
 /* ============================================================
-   SCHEDULED REMINDER
-   Derive every AXO's CURRENT status from all endorsements and, if any are
-   Urgent/High Prio (plus Blocked when REMIND_INCLUDE_BLOCKED='true'), post a
-   start-of-shift reminder. No-op (no spam) when none are open.
+   SCHEDULED REMINDER  (handler for the shift-start time triggers)
+   Derives every AXO's CURRENT status from all endorsements and posts a
+   start-of-shift HEARTBEAT to Slack on EVERY scheduled run:
+     • if any AXOs are currently Urgent/High Prio (plus Blocked when
+       REMIND_INCLUDE_BLOCKED='true'), it posts the list;
+     • if NONE are open, it posts a short all-clear line instead of staying
+       silent — so a quiet shift still confirms the schedule is alive.
+   The all-clear is gated by Script Property REMIND_WHEN_EMPTY, which DEFAULTS
+   TO TRUE: the all-clear posts unless REMIND_WHEN_EMPTY is explicitly set to
+   the string 'false'. Set it to 'false' only if you truly want silence on an
+   empty shift (then this behaves like the old no-op).
+   Always logs diagnostics to the Executions tab (counts, whether the webhook
+   is configured, the Slack POST response code) and NEVER throws — a failed
+   post or read is logged, not raised, so a trigger run is never left red for a
+   transient Slack/Sheet hiccup.
    ============================================================ */
 function sendUrgentReminder() {
-  var endorsements = readEndorsements_();
-  var derived = deriveAxos(endorsements);
-  var includeBlocked = String(getProp_('REMIND_INCLUDE_BLOCKED')).toLowerCase() === 'true';
-  var wanted = { 'Urgent/High Prio': true };
-  if (includeBlocked) wanted['Blocked'] = true;
+  try {
+    var endorsements = readEndorsements_();
+    var derived = deriveAxos(endorsements);
+    var includeBlocked = String(getProp_('REMIND_INCLUDE_BLOCKED')).toLowerCase() === 'true';
+    // REMIND_WHEN_EMPTY defaults to TRUE — only the exact string 'false' silences the all-clear.
+    var remindWhenEmpty = String(getProp_('REMIND_WHEN_EMPTY')).toLowerCase() !== 'false';
 
-  var open = derived.filter(function (a) { return wanted[a.current]; });
-  if (!open.length) return false; // nothing open — don't spam
+    var wanted = { 'Urgent/High Prio': true };
+    if (includeBlocked) wanted['Blocked'] = true;
+    var open = derived.filter(function (a) { return wanted[a.current]; });
 
-  var urgentGlyph = (STATUSES.filter(function (s) { return s.key === 'Urgent/High Prio'; })[0] || {}).glyph || '▲';
-  var lines = [];
-  lines.push(urgentGlyph + ' *Start-of-shift reminder — ' +
-    (includeBlocked ? 'Urgent/High Prio & Blocked' : 'Urgent/High Prio') +
-    ' AXOs still open (' + open.length + '):*');
-  open.forEach(function (a) {
-    var last = a.history[a.history.length - 1] || {};
-    var note = last.note ? ' — ' + last.note : '';
-    var who = a.lastQA ? ' (' + a.lastQA + ')' : '';
-    var stat = a.current === 'Blocked' ? ' [Blocked]' : '';
-    lines.push('• AXO ' + a.axo + note + who + stat);
-  });
-  postToSlack_(lines.join('\n'));
-  return true;
+    var urgentCount = derived.filter(function (a) { return a.current === 'Urgent/High Prio'; }).length;
+    var blockedCount = derived.filter(function (a) { return a.current === 'Blocked'; }).length;
+    var webhookSet = !!getProp_('SLACK_WEBHOOK_URL');
+
+    Logger.log('sendUrgentReminder: Urgent/High Prio=' + urgentCount +
+      (includeBlocked ? (', Blocked=' + blockedCount + ' (included)') : (', Blocked=' + blockedCount + ' (not included)')) +
+      ', open total=' + open.length +
+      ', REMIND_WHEN_EMPTY=' + remindWhenEmpty +
+      ', SLACK_WEBHOOK_URL ' + (webhookSet ? 'configured' : 'MISSING'));
+
+    var text;
+    if (open.length) {
+      var lines = [];
+      lines.push('🚨 *Start-of-shift reminder — ' +
+        (includeBlocked ? 'Urgent/High Prio & Blocked' : 'Urgent/High Prio') +
+        ' AXOs still open (' + open.length + '):*');
+      open.forEach(function (a) {
+        var last = a.history[a.history.length - 1] || {};
+        var note = last.note ? ' — ' + last.note : '';
+        var who = a.lastQA ? ' (' + a.lastQA + ')' : '';
+        var stat = a.current === 'Blocked' ? ' [Blocked]' : '';
+        lines.push('• AXO ' + a.axo + note + who + stat);
+      });
+      text = lines.join('\n');
+    } else {
+      if (!remindWhenEmpty) {
+        Logger.log('sendUrgentReminder: nothing open and REMIND_WHEN_EMPTY=false — staying silent.');
+        return false;
+      }
+      text = '✅ *Start-of-shift check — No ' +
+        (includeBlocked ? 'Urgent/High Prio or Blocked' : 'Urgent/High Prio') +
+        ' AXOs right now.*';
+    }
+
+    var code = postToSlack_(text);
+    Logger.log('sendUrgentReminder: ' + (open.length ? ('posted ' + open.length + ' open AXO(s)') : 'posted all-clear') +
+      '; postToSlack_ returned ' + code +
+      (webhookSet ? '' : ' (no webhook configured — nothing was sent)'));
+    return true;
+  } catch (e) {
+    Logger.log('sendUrgentReminder failed: ' + e + (e && e.stack ? ('\n' + e.stack) : ''));
+    return false;
+  }
 }
 
 /* ============================================================
    TRIGGERS
-   Three daily time-based triggers at the shift starts. The manifest timeZone is
-   Asia/Manila, so atHour is local PHT: 5 AM (Day), 1 PM (Mid), 10 PM (Night).
-   Run this once from the editor (authorize when prompted).
+   Installs exactly three daily time-based triggers at the shift starts, all
+   calling sendUrgentReminder. The manifest timeZone is Asia/Manila, so atHour
+   is local PHT: 5 AM (Day), 1 PM (Mid), 10 PM (Night). Idempotent — it deletes
+   any existing sendUrgentReminder triggers first, so re-running never stacks
+   duplicates.
+
+   IMPORTANT: time-based triggers always run the LATEST SAVED project code — you
+   do NOT need to redeploy the Web App after editing Code.gs for the reminder to
+   pick up changes; just Save. You only need to run setupShiftReminders() again
+   if the three triggers are missing (e.g. none were ever installed, or they
+   were deleted in the Triggers page). Changing a Script Property
+   (REMIND_WHEN_EMPTY / REMIND_INCLUDE_BLOCKED / SLACK_WEBHOOK_URL) also takes
+   effect immediately with no redeploy and no re-run of this function.
    ============================================================ */
 function setupShiftReminders() {
   // Remove any existing triggers for sendUrgentReminder first (idempotent).
@@ -642,12 +705,11 @@ function urgentRowsOf(model){
 function buildSlackAlert(model, opts){
   if (!model) return '';
   var prefix = (opts && opts.updated) ? '(updated) ' : '';
-  var urgentGlyph = (STATUSES.filter(function(s){ return s.key === 'Urgent/High Prio'; })[0] || {}).glyph || '▲';
   var lines = [];
-  lines.push('*' + prefix + 'New QA Endorsement — ' + model.shiftDate + ' · ' + model.shift + ' · ' + model.qaResource + '*');
+  lines.push('📋 *' + prefix + 'New QA Endorsement — ' + model.shiftDate + ' · ' + model.shift + ' · ' + model.qaResource + '*');
   var urgent = urgentRowsOf(model);
   if (urgent.length){
-    lines.push(urgentGlyph + ' *Urgent / High Prio (' + urgent.length + '):*');
+    lines.push('🚨 *Urgent / High Prio (' + urgent.length + '):*');
     urgent.forEach(function(r){ lines.push('• AXO ' + (r.axo || '—') + (r.note ? ' — ' + r.note : '')); });
   }
   var c = sectionCounts(model);
