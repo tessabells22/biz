@@ -24,7 +24,7 @@
    ============================================================ */
 
 /* ---------- constants ---------- */
-var BUILD = '2026-10-08.3'; // kept in step with the clients' BUILD stamp
+var BUILD = '2026-10-08.4'; // kept in step with the clients' BUILD stamp
 var SHEET_NAME = 'Endorsements';
 var HEADERS = ['Id', 'ShiftDate', 'Shift', 'QAResource', 'Payload', 'CreatedAt', 'UpdatedAt'];
 var DRIVE_FOLDER_NAME = 'NPD QA Test Files';

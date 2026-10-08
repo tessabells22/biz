@@ -812,7 +812,7 @@
 
 /* Deployed build stamp — shown in the header so anyone can confirm at a glance
    whether the copy they are looking at is the latest deploy. Bump on each ship. */
-const BUILD = '2026-10-08.3';
+const BUILD = '2026-10-08.4';
 
 const STATUSES = [
   { key:'Not Tested',                   token:'--st-nottested',      glyph:'○' },
@@ -1128,15 +1128,30 @@ function deriveAxos(endorsements){
   return out;
 }
 
-/* Distinct AXOs each QA most-recently touched. */
-function computeWorkload(derived){
-  const counts = {};
-  for (const a of derived){
-    const qa = a.lastQA || 'Unassigned';
-    counts[qa] = (counts[qa] || 0) + 1;
+/* Distinct AXOs each QA worked on, across the endorsements that QA authored
+   (contribution, not current ownership). An AXO a QA logged across several of
+   their own shifts counts ONCE for that QA; an AXO worked on by two QAs counts
+   for BOTH, so the summed total may exceed the Total AXOs count (expected for a
+   contribution view). Every QA who authored at least one endorsement is
+   included, even one whose AXOs were all re-touched by a later shift. */
+function computeWorkload(endorsements){
+  const axoSectionKeys = SECTIONS.filter(s => s.axo).map(s => s.key);
+  const byQA = {};
+  for (const e of endorsements){
+    const qa = (e.qaResource || '').trim() || 'Unassigned';
+    if (!byQA[qa]) byQA[qa] = new Set();
+    const sections = e.sections || {};
+    for (const secKey of axoSectionKeys){
+      const rows = Array.isArray(sections[secKey]) ? sections[secKey] : [];
+      for (const r of rows){
+        if (!r || r.axo === undefined || r.axo === null) continue;
+        const axo = String(r.axo).trim();
+        if (axo) byQA[qa].add(axo);
+      }
+    }
   }
-  return Object.keys(counts)
-    .map(qa => ({ qa, count: counts[qa] }))
+  return Object.keys(byQA)
+    .map(qa => ({ qa, count: byQA[qa].size }))
     .sort((a, b) => b.count - a.count || a.qa.localeCompare(b.qa));
 }
 
@@ -1796,7 +1811,7 @@ function renderDashboard(){
       </div>`;
   }).join('');
 
-  const workload = computeWorkload(d);
+  const workload = computeWorkload(state.endorsements);
   const maxW = Math.max(1, ...workload.map(w => w.count));
   const ticks = maxW <= 4 ? maxW : (maxW <= 8 ? Math.ceil(maxW/2)*2 : maxW);
   const wlRows = workload.map((w, i) => {
@@ -1823,7 +1838,7 @@ function renderDashboard(){
       <div class="card card-pad">
         <div class="section-head" style="margin:0 0 14px">
           <h2 style="font-size:14px">NPD QA workload</h2>
-          <span class="hint">Distinct AXOs each QA most recently touched</span>
+          <span class="hint">Distinct AXOs each QA worked on</span>
         </div>
         <div class="wl">${wlRows || '<div class="sec-empty">No data yet.</div>'}</div>
         ${workload.length ? `<div class="wl-axis"><span>0</span><span>${ticks}</span></div>` : ''}
