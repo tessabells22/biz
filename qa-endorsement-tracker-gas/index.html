@@ -375,6 +375,30 @@
   .wl-val{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
   .wl-axis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px;padding-left:86px}
 
+  /* ---------- Dashboard right rail: Snapshot + Latest handover, stacked above
+     the workload chart. The rail is the grid's second column; its cards keep the
+     same 16px rhythm and the column's bounded width, so nothing overflows. ---------- */
+  .dash-rail{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .snap-asof{font-size:12px;color:var(--muted);letter-spacing:.01em;font-variant-numeric:tabular-nums}
+  .snap-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .snap-stat{display:flex;flex-direction:column;gap:4px;padding:11px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);min-width:0}
+  .snap-stat .s-val{font-size:25px;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--fg);font-variant-numeric:tabular-nums}
+  .snap-stat .s-lab{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--fg-2);line-height:1.25}
+  .snap-stat .s-lab .sdot{width:8px;height:8px;border-radius:50%;background:var(--sc,var(--muted));flex:none}
+  .snap-stat.attn-stat{background:color-mix(in srgb,var(--st-urgent) 8%,var(--surface-2));border-color:color-mix(in srgb,var(--st-urgent) 30%,var(--border))}
+  /* Latest handover mini-card */
+  .handover{display:flex;flex-direction:column}
+  .ho-btn{display:flex;flex-direction:column;gap:9px;width:100%;text-align:left;background:none;border:0;padding:0;margin:0;cursor:pointer;color:inherit;font:inherit;border-radius:var(--radius-sm)}
+  .ho-when{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0}
+  .ho-date{font-size:15px;font-weight:700;color:var(--fg);font-variant-numeric:tabular-nums}
+  .ho-shift{font-size:12.5px;font-weight:650;color:var(--brand-2-ink)}
+  .ho-qa{font-size:12.5px;color:var(--fg-2)}
+  .ho-sep{color:var(--muted);font-size:11px}
+  .ho-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .ho-btn:hover .ho-date{text-decoration:underline;text-underline-offset:2px}
+  .ho-empty{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+  .ho-empty .ok-ic{color:var(--st-passed);font-weight:700;font-size:13px;line-height:1}
+
   /* ---------- Status pill ---------- */
   .st{
     display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
@@ -816,7 +840,7 @@
 
 /* Deployed build stamp — shown in the header so anyone can confirm at a glance
    whether the copy they are looking at is the latest deploy. Bump on each ship. */
-const BUILD = '2026-10-08.5';
+const BUILD = '2026-10-08.6';
 
 const STATUSES = [
   { key:'Not Tested',                   token:'--st-nottested',      glyph:'○' },
@@ -1577,6 +1601,7 @@ const store = {
 const state = {
   endorsements: [],
   derived: [],
+  loadedAt: null,        // set each time endorsements are (re)loaded — drives the Snapshot "as of" line
   activeTab: 'dashboard',
   sortKey: 'lastDate',
   sortDir: 'desc',
@@ -1761,6 +1786,45 @@ function bucketKeyOf(status){
   return b ? b.key : status;
 }
 
+/* ---- Dashboard right-rail: Snapshot quick-stats + Latest handover ----
+   Every figure is derived live from the already-loaded endorsements and the
+   same current-status set the dashboard buckets use — nothing new is stored. */
+
+/* Today as a canonical Asia/Manila YYYY-MM-DD, so "Shifts today" counts the
+   shift dates that fall on the Manila calendar day, not the viewer's zone. */
+function manilaToday(){
+  try { return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Manila' }).format(new Date()); }
+  catch (e){ const d = new Date(); return isoDay_(d.getFullYear(), d.getMonth() + 1, d.getDate()); }
+}
+
+/* "As of Mon, Oct 8 · 2:34 PM" in Asia/Manila. Empty string until the first load. */
+function fmtAsOf(d){
+  if (!(d instanceof Date) || isNaN(d.getTime())) return '';
+  try {
+    const day  = new Intl.DateTimeFormat('en-US', { timeZone:'Asia/Manila', weekday:'short', month:'short', day:'numeric' }).format(d);
+    const time = new Intl.DateTimeFormat('en-US', { timeZone:'Asia/Manila', hour:'numeric', minute:'2-digit' }).format(d);
+    return 'As of ' + day + ' · ' + time;
+  } catch (e){ return 'As of ' + d.toLocaleString(); }
+}
+
+/* The four Snapshot quick-stats, none of them a status tile: total endorsements,
+   endorsements whose shift date is today (Manila), the distinct QA Resource
+   names, and the "open items" roll-up — AXOs whose CURRENT status needs
+   attention (Blocked, Urgent/High Prio, Needs Monitoring or Not Tested). */
+const SNAP_OPEN_STATUSES = ['Blocked', 'Urgent/High Prio', 'Needs Monitoring', 'Not Tested'];
+function snapshotStats(endorsements, derived){
+  const today = manilaToday();
+  const qas = new Set();
+  let shiftsToday = 0;
+  endorsements.forEach(e => {
+    const qa = (e.qaResource || '').trim();
+    if (qa) qas.add(qa);
+    if (normDate(e.shiftDate) === today) shiftsToday++;
+  });
+  const openItems = derived.filter(a => SNAP_OPEN_STATUSES.indexOf(a.current) !== -1).length;
+  return { endorsements: endorsements.length, shiftsToday, activeQAs: qas.size, openItems };
+}
+
 function renderDashboard(){
   const d = state.derived;
   const total = d.length;
@@ -1815,6 +1879,26 @@ function renderDashboard(){
       </div>`;
   }).join('');
 
+  // Snapshot card: as-of line (from the last load) + four non-redundant quick stats.
+  const asOf = fmtAsOf(state.loadedAt);
+  const snap = snapshotStats(state.endorsements, d);
+
+  // Latest handover card: the single most-recent endorsement, by the SAME latest-
+  // entry ordering used everywhere else (date → shift Day<Mid<Night → creation).
+  const latest = sortedEndorsements()[0];
+  const handoverHtml = latest
+    ? `<div class="handover">
+        <button type="button" class="ho-btn" data-goto-log aria-label="Open the latest handover in the Shift Log">
+          <span class="ho-when">
+            <span class="ho-date">${esc(fmtDate(normDate(latest.shiftDate)))}</span>
+            <span class="ho-sep">·</span><span class="ho-shift">${esc(latest.shift)}</span>
+            <span class="ho-sep">·</span><span class="ho-qa">${esc(latest.qaResource) || '—'}</span>
+          </span>
+          <span class="ho-chips">${endoChipsHtml(latest)}</span>
+        </button>
+      </div>`
+    : `<div class="ho-empty"><span class="ok-ic">✓</span>No handovers logged yet.</div>`;
+
   const workload = computeWorkload(state.endorsements);
   const maxW = Math.max(1, ...workload.map(w => w.count));
   const ticks = maxW <= 4 ? maxW : (maxW <= 8 ? Math.ceil(maxW/2)*2 : maxW);
@@ -1839,13 +1923,31 @@ function renderDashboard(){
         <div class="section-head" style="margin:0 0 12px"><h2 style="font-size:14px">Needs attention now</h2></div>
         <div class="attn-cols">${attn}</div>
       </div>
-      <div class="card card-pad">
-        <div class="section-head" style="margin:0 0 14px">
-          <h2 style="font-size:14px">NPD QA workload</h2>
-          <span class="hint">Distinct AXOs each QA worked on</span>
+      <div class="dash-rail">
+        <div class="card card-pad">
+          <div class="section-head" style="margin:0 0 12px;flex-direction:column;align-items:flex-start;gap:2px">
+            <h2 style="font-size:14px">Snapshot</h2>
+            <span class="snap-asof">${esc(asOf)}</span>
+          </div>
+          <div class="snap-grid">
+            <div class="snap-stat"><span class="s-val">${snap.endorsements}</span><span class="s-lab">Endorsements</span></div>
+            <div class="snap-stat"><span class="s-val">${snap.shiftsToday}</span><span class="s-lab">Shifts today</span></div>
+            <div class="snap-stat"><span class="s-val">${snap.activeQAs}</span><span class="s-lab">Active QAs</span></div>
+            <div class="snap-stat attn-stat" style="--sc:var(--st-urgent)"><span class="s-val">${snap.openItems}</span><span class="s-lab"><span class="sdot"></span>Open items</span></div>
+          </div>
         </div>
-        <div class="wl">${wlRows || '<div class="sec-empty">No data yet.</div>'}</div>
-        ${workload.length ? `<div class="wl-axis"><span>0</span><span>${ticks}</span></div>` : ''}
+        <div class="card card-pad">
+          <div class="section-head" style="margin:0 0 12px"><h2 style="font-size:14px">Latest handover</h2></div>
+          ${handoverHtml}
+        </div>
+        <div class="card card-pad">
+          <div class="section-head" style="margin:0 0 14px">
+            <h2 style="font-size:14px">NPD QA workload</h2>
+            <span class="hint">Distinct AXOs each QA worked on</span>
+          </div>
+          <div class="wl">${wlRows || '<div class="sec-empty">No data yet.</div>'}</div>
+          ${workload.length ? `<div class="wl-axis"><span>0</span><span>${ticks}</span></div>` : ''}
+        </div>
       </div>
     </div>`;
 
@@ -1854,6 +1956,8 @@ function renderDashboard(){
     switchTab('tracker');
   }));
   $$('#view-dashboard [data-goto]').forEach(b => b.addEventListener('click', () => gotoAxo(b.dataset.goto)));
+  const hb = $('#view-dashboard [data-goto-log]');
+  if (hb) hb.addEventListener('click', () => switchTab('log'));
 }
 
 function gotoAxo(axo){
@@ -2751,6 +2855,7 @@ async function reload(){
     toast('Could not load data: ' + err.message, 'err');
     state.endorsements = [];
   }
+  state.loadedAt = new Date();
   recompute();
   // A change to the endorsements list — an add, an edit, or a DELETE — re-derives
   // the AXO set, so re-render every data-derived view, not just the active tab: the
@@ -2794,7 +2899,7 @@ function wire(){
       $('#refreshBtn').disabled = false;
       return;
     }
-    if (items) { state.endorsements = items; recompute(); }
+    if (items) { state.endorsements = items; state.loadedAt = new Date(); recompute(); }
     else await reload();
     $('#view-error').hidden = true;
     renderConn();
@@ -2818,6 +2923,7 @@ async function boot(){
   const h = (location.hash || '').slice(1);
   if (['dashboard','tracker','log','new'].includes(h)) state.activeTab = h;
   state.endorsements = await store.detect();
+  state.loadedAt = new Date();
   if (store.mode === 'error'){
     renderConn();
     renderErrorState();
