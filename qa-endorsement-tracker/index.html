@@ -199,6 +199,7 @@
   .apptitle{min-width:0;display:flex;flex-direction:column;gap:1px;margin-right:auto;border-left:1px solid var(--border);padding-left:14px;margin-left:2px}
   .apptitle h1{font-size:16px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;color:var(--fg)}
   .apptitle .sub{font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .build-stamp{font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--muted);opacity:.75;border:1px solid var(--border);border-radius:5px;padding:0 5px;margin-left:2px;vertical-align:1px}
 
   .pill-conn{
     display:inline-flex;align-items:center;gap:7px;
@@ -638,7 +639,7 @@
       </a>
       <div class="apptitle">
         <h1>NPD QA Endorsement Tracker</h1>
-        <div class="sub">Endorsement of Tasks &middot; shared shift handover</div>
+        <div class="sub">Endorsement of Tasks &middot; shared shift handover <span class="build-stamp" id="buildStamp" title="Deployed build"></span></div>
       </div>
       <span id="connPill" class="pill-conn"><span class="dot"></span><span id="connText">Connecting…</span></span>
       <button class="iconbtn primary" id="copyBtn" title="Copy the latest endorsement in Slack handover format">⧉ Copy latest as Slack</button>
@@ -748,6 +749,11 @@ const SP_CONFIG = {
    PURE LOGIC (also unit-tested) START
    No DOM / browser references in this block (ends at the END marker below).
    ============================================================ */
+
+/* Deployed build stamp — shown in the header so anyone can confirm at a glance
+   whether the copy they are looking at is the latest deploy. Bump on each ship. */
+const BUILD = '2026-10-08.1';
+
 const STATUSES = [
   { key:'Not Tested',                   token:'--st-nottested',      glyph:'○' },
   { key:'In Progress',                  token:'--st-inprogress',     glyph:'◐' },
@@ -969,6 +975,34 @@ function shiftRank(shift){
   return shift === 'Day' ? 0 : shift === 'Mid' ? 1 : shift === 'Night' ? 2 : 3;
 }
 
+/* Zero-pad y/m/d into a canonical 'YYYY-MM-DD' string. */
+function isoDay_(y, mo, da){
+  return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (da < 10 ? '0' : '') + da;
+}
+
+/* Normalize ANY ShiftDate representation to a canonical, lexicographically
+   sortable 'YYYY-MM-DD' calendar day — whether the value arrives as a plain
+   'YYYY-MM-DD' string, an ISO datetime with a Z or +08:00 offset, a Date object,
+   or a locale string. The SAME normalized value feeds both the displayed date
+   and the sort key, so the timeline and the ordering can never disagree. For any
+   string that begins with a 'YYYY-MM-DD' we take that literal day (timezone-free,
+   so an offset can never flip the calendar date). An unparseable value becomes ''
+   which sorts before every real date and can never silently equal one. */
+function normDate(v){
+  if (v === null || v === undefined) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]'){
+    if (isNaN(v.getTime())) return '';
+    return isoDay_(v.getFullYear(), v.getMonth() + 1, v.getDate());
+  }
+  var s = String(v).trim();
+  if (!s) return '';
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) return isoDay_(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  return '';
+}
+
 /* Aggregate every AXO entry across all endorsements, group by AXO number,
    sort chronologically (shiftDate, then Day<Mid<Night, then endorsement order,
    then line order). Current status = most recent entry's status. */
@@ -982,6 +1016,7 @@ function deriveAxos(endorsements){
 
   for (const { e, seq } of list){
     const sections = e.sections || {};
+    const nd = normDate(e.shiftDate); // canonical day — drives BOTH display and sort
     for (const secKey of Object.keys(sectionTitleByKey)){
       const rows = Array.isArray(sections[secKey]) ? sections[secKey] : [];
       for (const r of rows){
@@ -991,14 +1026,14 @@ function deriveAxos(endorsements){
         if (!map.has(axo)) map.set(axo, []);
         map.get(axo).push({
           axo,
-          date: e.shiftDate,
+          date: nd,
           shift: e.shift,
           qaResource: e.qaResource || '',
           section: sectionTitleByKey[secKey],
           sectionKey: secKey,
           note: r.note || '',
           status: r.status || 'Not Tested',
-          _date: e.shiftDate,
+          _date: nd,
           _shift: shiftRank(e.shift),
           _seq: seq,
           _ord: push++
@@ -1824,8 +1859,8 @@ function renderTracker(){
         <td class="touches">${a.touches}</td>
       </tr>`;
     if (!open) return main;
-    const tl = a.history.map((h, i) => {
-      const isCur = i === a.history.length - 1;
+    const tl = a.history.slice().reverse().map((h, i) => {
+      const isCur = i === 0; // newest entry on top, carries the CURRENT marker
       const m = statusMeta(h.status);
       return `<li class="tl-item${isCur?' cur':''}" style="--sc:var(${m.token})">
           <span class="tl-dot"></span>
@@ -2786,6 +2821,7 @@ function cycleTheme(){
 }
 
 function wire(){
+  const bs = $('#buildStamp'); if (bs) bs.textContent = 'build ' + BUILD;
   $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
   $('#refreshBtn').addEventListener('click', async () => {
     $('#refreshBtn').disabled = true;

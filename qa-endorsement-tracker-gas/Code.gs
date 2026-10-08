@@ -18,6 +18,7 @@
    ============================================================ */
 
 /* ---------- constants ---------- */
+var BUILD = '2026-10-08.1'; // kept in step with the clients' BUILD stamp
 var SHEET_NAME = 'Endorsements';
 var HEADERS = ['Id', 'ShiftDate', 'Shift', 'QAResource', 'Payload', 'CreatedAt', 'UpdatedAt'];
 var DRIVE_FOLDER_NAME = 'NPD QA Test Files';
@@ -65,6 +66,34 @@ function colOf_(name) {
    CRUD
    ============================================================ */
 
+/* The script's timezone (Asia/Manila per the manifest), used to resolve a Sheet
+   Date cell to the calendar day the team actually meant. */
+function scriptTimeZone_() {
+  try { return Session.getScriptTimeZone() || 'Asia/Manila'; } catch (e) { return 'Asia/Manila'; }
+}
+
+/* Coerce whatever the ShiftDate cell yields into a canonical 'YYYY-MM-DD' before
+   it ever reaches the client. getValues() returns a real Date object when Sheets
+   has coerced the text to a date (which String()+slice would mangle into e.g.
+   "Wed Oct 07" and break date comparison); format such a Date in the script
+   timezone so the calendar day is stable. A string that already begins with a
+   'YYYY-MM-DD' passes through (timezone-free); anything else is parsed as a last
+   resort, and empties stay empty. */
+function coerceSheetDate_(value) {
+  if (value === null || value === undefined || value === '') return '';
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    if (isNaN(value.getTime())) return '';
+    return Utilities.formatDate(value, scriptTimeZone_(), 'yyyy-MM-dd');
+  }
+  var s = String(value).trim();
+  if (!s) return '';
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) return Utilities.formatDate(d, scriptTimeZone_(), 'yyyy-MM-dd');
+  return '';
+}
+
 /* Parse one sheet row object into an endorsement model, mirroring the client's
    spToModel: Payload JSON holds { sections, fileRefs }; legacy top-level sections
    are still read. Ensures every section key is an array. */
@@ -75,8 +104,7 @@ function rowToModel_(values) {
   if (!sections || typeof sections !== 'object') sections = {};
   var fileRefs = Array.isArray(payload && payload.fileRefs) ? payload.fileRefs : [];
   SECTIONS.forEach(function (s) { if (!Array.isArray(sections[s.key])) sections[s.key] = []; });
-  var date = String(values[colOf_('ShiftDate') - 1] || '');
-  if (date.length > 10) date = date.slice(0, 10);
+  var date = coerceSheetDate_(values[colOf_('ShiftDate') - 1]);
   return {
     id: String(values[colOf_('Id') - 1] || ''),
     shiftDate: date,
@@ -105,24 +133,35 @@ function apiList() {
   return readEndorsements_();
 }
 
+/* Pin the ShiftDate cell to plain-text format and (re)write the canonical string,
+   so Sheets cannot auto-coerce 'YYYY-MM-DD' into a locale/serial Date that would
+   later round-trip wrong and break the current-status date comparison. */
+function writeShiftDateAsText_(sheet, rowIdx, sd) {
+  var cell = sheet.getRange(rowIdx, colOf_('ShiftDate'));
+  cell.setNumberFormat('@'); // plain text — never a date serial
+  cell.setValue(sd || '');
+}
+
 function apiAdd(model) {
   var sheet = ensureSheets_();
   model = model || {};
   var id = Utilities.getUuid();
   var now = new Date().toISOString();
+  var sd = coerceSheetDate_(model.shiftDate); // canonical 'YYYY-MM-DD' (or '')
   var row = [];
   row[colOf_('Id') - 1] = id;
-  row[colOf_('ShiftDate') - 1] = model.shiftDate || '';
+  row[colOf_('ShiftDate') - 1] = sd;
   row[colOf_('Shift') - 1] = model.shift || 'Day';
   row[colOf_('QAResource') - 1] = model.qaResource || '';
   row[colOf_('Payload') - 1] = payloadOf_(model);
   row[colOf_('CreatedAt') - 1] = now;
   row[colOf_('UpdatedAt') - 1] = now;
   sheet.appendRow(row);
+  writeShiftDateAsText_(sheet, sheet.getLastRow(), sd); // keep ShiftDate plain text
 
   var saved = {
     id: id,
-    shiftDate: model.shiftDate || '',
+    shiftDate: sd,
     shift: model.shift || 'Day',
     qaResource: model.qaResource || '',
     sections: model.sections || {},
@@ -140,7 +179,8 @@ function apiUpdate(id, model) {
   var rowIdx = findRowById_(sheet, id);
   if (rowIdx < 0) throw new Error('Endorsement not found: ' + id);
   var now = new Date().toISOString();
-  sheet.getRange(rowIdx, colOf_('ShiftDate')).setValue(model.shiftDate || '');
+  var sd = coerceSheetDate_(model.shiftDate); // canonical 'YYYY-MM-DD' (or '')
+  writeShiftDateAsText_(sheet, rowIdx, sd);     // keep ShiftDate plain text
   sheet.getRange(rowIdx, colOf_('Shift')).setValue(model.shift || 'Day');
   sheet.getRange(rowIdx, colOf_('QAResource')).setValue(model.qaResource || '');
   sheet.getRange(rowIdx, colOf_('Payload')).setValue(payloadOf_(model));
@@ -148,7 +188,7 @@ function apiUpdate(id, model) {
   // No auto-post on edit.
   return {
     id: String(id),
-    shiftDate: model.shiftDate || '',
+    shiftDate: sd,
     shift: model.shift || 'Day',
     qaResource: model.qaResource || '',
     sections: model.sections || {},
@@ -481,6 +521,35 @@ function shiftRank(shift){
   return shift === 'Day' ? 0 : shift === 'Mid' ? 1 : shift === 'Night' ? 2 : 3;
 }
 
+/* Zero-pad y/m/d into a canonical 'YYYY-MM-DD' string. */
+function isoDay_(y, mo, da){
+  return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (da < 10 ? '0' : '') + da;
+}
+
+/* Normalize ANY ShiftDate representation to a canonical, lexicographically
+   sortable 'YYYY-MM-DD' calendar day — whether the value arrives as a plain
+   'YYYY-MM-DD' string, an ISO datetime with a Z or +08:00 offset, a Date object,
+   or a locale string. The SAME normalized value feeds both the displayed date
+   and the sort key, so the timeline and the ordering can never disagree. For any
+   string that begins with a 'YYYY-MM-DD' we take that literal day (timezone-free,
+   so an offset can never flip the calendar date). An unparseable value becomes ''
+   which sorts before every real date and can never silently equal one.
+   (Kept in parity with the clients' PURE LOGIC normDate.) */
+function normDate(v){
+  if (v === null || v === undefined) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]'){
+    if (isNaN(v.getTime())) return '';
+    return isoDay_(v.getFullYear(), v.getMonth() + 1, v.getDate());
+  }
+  var s = String(v).trim();
+  if (!s) return '';
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) return isoDay_(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  return '';
+}
+
 /* Aggregate every AXO entry across all endorsements, group by AXO number,
    sort chronologically. Current status = most recent entry's status. */
 function deriveAxos(endorsements){
@@ -495,6 +564,7 @@ function deriveAxos(endorsements){
   list.forEach(function(entry){
     var e = entry.e, seq = entry.seq;
     var sections = e.sections || {};
+    var nd = normDate(e.shiftDate); // canonical day — drives BOTH display and sort
     Object.keys(sectionTitleByKey).forEach(function(secKey){
       var rows = Array.isArray(sections[secKey]) ? sections[secKey] : [];
       rows.forEach(function(r){
@@ -504,14 +574,14 @@ function deriveAxos(endorsements){
         if (!map[axo]) { map[axo] = []; order.push(axo); }
         map[axo].push({
           axo: axo,
-          date: e.shiftDate,
+          date: nd,
           shift: e.shift,
           qaResource: e.qaResource || '',
           section: sectionTitleByKey[secKey],
           sectionKey: secKey,
           note: r.note || '',
           status: r.status || 'Not Tested',
-          _date: e.shiftDate,
+          _date: nd,
           _shift: shiftRank(e.shift),
           _seq: seq,
           _ord: push++
