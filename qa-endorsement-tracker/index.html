@@ -283,7 +283,11 @@
   .tile .t-lab .sdot{width:9px;height:9px;border-radius:50%;background:var(--tc);flex:none}
   .tile:hover{border-color:color-mix(in srgb,var(--tc) 45%,var(--border))}
 
+  /* Below the tiles: "Needs attention now" (left, flexible) sits beside the
+     "NPD QA workload" card as a bounded right-hand rail. Under 900px the two
+     stack into one column (attention, then workload) — today's behaviour. */
   .dash-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px;align-items:start}
+  @media(min-width:900px){.dash-grid{grid-template-columns:minmax(0,1fr) clamp(260px,26%,360px)}}
 
   .attn-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:start}
   @media(max-width:520px){.attn-cols{grid-template-columns:1fr}}
@@ -768,7 +772,7 @@ const SP_CONFIG = {
 
 /* Deployed build stamp — shown in the header so anyone can confirm at a glance
    whether the copy they are looking at is the latest deploy. Bump on each ship. */
-const BUILD = '2026-10-08.4';
+const BUILD = '2026-10-08.5';
 
 const STATUSES = [
   { key:'Not Tested',                   token:'--st-nottested',      glyph:'○' },
