@@ -9,7 +9,7 @@
      • apiList/Add/Update/Remove — Google Sheet CRUD
      • apiUploadFile  — Drive uploads (returns a shareable link)
      • Slack          — server-side auto-post on every add
-     • Reminders      — native time triggers at each shift start
+     • Reminders      — one 30-min tick that checks Manila time itself
 
    Config lives in Script Properties (Project Settings), never in
    source:
@@ -20,11 +20,13 @@
        all-clear heartbeat when no Urgent/High Prio (or Blocked) AXOs are open.
        Set to 'false' to stay silent on an empty shift.
      • DRIVE_FOLDER_ID       — auto-managed.
+     • LAST_SHIFT_POSTED     — auto-managed by shiftReminderTick (the shift key
+       of the last reminder posted); don't edit. Clear it to force a re-post.
    See README.md.
    ============================================================ */
 
 /* ---------- constants ---------- */
-var BUILD = '2026-10-08.6'; // kept in step with the clients' BUILD stamp
+var BUILD = '2026-10-08.7'; // kept in step with the clients' BUILD stamp
 var SHEET_NAME = 'Endorsements';
 var HEADERS = ['Id', 'ShiftDate', 'Shift', 'QAResource', 'Payload', 'CreatedAt', 'UpdatedAt'];
 var DRIVE_FOLDER_NAME = 'NPD QA Test Files';
@@ -393,7 +395,8 @@ function sendNewEndorsementAlert_(model) {
 }
 
 /* ============================================================
-   SCHEDULED REMINDER  (handler for the shift-start time triggers)
+   SCHEDULED REMINDER  (check+build+post — called by shiftReminderTick,
+   and runnable manually from the editor)
    Derives every AXO's CURRENT status from all endorsements and posts a
    start-of-shift HEARTBEAT to Slack on EVERY scheduled run:
      • if any AXOs are currently Urgent/High Prio (plus Blocked when
@@ -467,30 +470,101 @@ function sendUrgentReminder() {
 }
 
 /* ============================================================
-   TRIGGERS
-   Installs exactly three daily time-based triggers at the shift starts, all
-   calling sendUrgentReminder. The manifest timeZone is Asia/Manila, so atHour
-   is local PHT: 5 AM (Day), 1 PM (Mid), 10 PM (Night). Idempotent — it deletes
-   any existing sendUrgentReminder triggers first, so re-running never stacks
-   duplicates.
+   SHIFT REMINDER TICK  (the single trigger handler)
+   Runs every 30 minutes and decides for ITSELF — from the real Manila clock,
+   not the project time zone — whether a new shift has just started and the
+   reminder is due. This is the timezone-proof replacement for the old three
+   everyDays(1).atHour() triggers, which fired in a fuzzy window and silently
+   depended on the manifest timeZone being Asia/Manila (so a 5 AM reminder
+   could be skipped entirely).
+
+   How it works:
+     • Compute the current Manila date + hour explicitly via
+       Utilities.formatDate(..., 'Asia/Manila', ...) — never new Date() locals.
+     • Map the Manila hour to the shift currently due:
+         hour >= 22        -> Night, today's date
+         hour >= 13        -> Mid,   today's date
+         hour >= 5         -> Day,   today's date
+         hour 0..4         -> Night, YESTERDAY's date (the night shift that
+                              began at 10 PM the previous calendar day)
+       and build a shift key '<YYYY-MM-DD>:<Shift>'.
+     • Compare against Script Property LAST_SHIFT_POSTED. If it already equals
+       the due key, this shift was already posted — do nothing. Otherwise call
+       sendUrgentReminder() and, on a completed attempt, record the key.
+   The 30-minute cadence reliably catches each shift-start hour; the dedupe via
+   LAST_SHIFT_POSTED guarantees exactly one post per shift (5 AM / 1 PM / 10 PM
+   PHT) and never a double-post within the same shift.
+
+   NEVER throws — wrapped in try/catch so a transient hiccup never leaves the
+   trigger run red. LAST_SHIFT_POSTED is managed automatically; clear it (or run
+   sendUrgentReminder manually) to force a re-post for the current shift.
+   ============================================================ */
+function shiftReminderTick() {
+  try {
+    var now = new Date();
+    var manilaDate = Utilities.formatDate(now, 'Asia/Manila', 'yyyy-MM-dd');
+    var manilaHour = parseInt(Utilities.formatDate(now, 'Asia/Manila', 'HH'), 10);
+
+    var shift, shiftDate;
+    if (manilaHour >= 22) {
+      shift = 'Night'; shiftDate = manilaDate;
+    } else if (manilaHour >= 13) {
+      shift = 'Mid'; shiftDate = manilaDate;
+    } else if (manilaHour >= 5) {
+      shift = 'Day'; shiftDate = manilaDate;
+    } else {
+      // hours 0..4 belong to the Night shift that started at 10 PM YESTERDAY.
+      shift = 'Night';
+      shiftDate = Utilities.formatDate(
+        new Date(now.getTime() - 24 * 60 * 60 * 1000), 'Asia/Manila', 'yyyy-MM-dd');
+    }
+    var dueKey = shiftDate + ':' + shift;
+
+    var lastPosted = getProp_('LAST_SHIFT_POSTED');
+    if (lastPosted === dueKey) {
+      Logger.log('shiftReminderTick: Manila ' + manilaDate + ' ' + manilaHour +
+        ':00 — due shift ' + dueKey + ' already posted — skipping.');
+      return;
+    }
+
+    Logger.log('shiftReminderTick: Manila ' + manilaDate + ' ' + manilaHour +
+      ':00 — due shift ' + dueKey + ' not yet posted (last=' +
+      (lastPosted || '(none)') + ') — posting.');
+    sendUrgentReminder();
+    PropertiesService.getScriptProperties().setProperty('LAST_SHIFT_POSTED', dueKey);
+    Logger.log('shiftReminderTick: recorded LAST_SHIFT_POSTED=' + dueKey + '.');
+  } catch (e) {
+    Logger.log('shiftReminderTick failed: ' + e + (e && e.stack ? ('\n' + e.stack) : ''));
+  }
+}
+
+/* ============================================================
+   TRIGGERS — single setup entry point
+   Installs ONE time-based trigger: shiftReminderTick every 30 minutes. The
+   handler checks the Manila clock itself and posts once per shift start, so the
+   project time-zone setting no longer matters for the reminder.
+
+   Idempotent migration: deletes ALL existing triggers for BOTH the new
+   shiftReminderTick AND the old sendUrgentReminder handler first, so re-running
+   this once cleanly replaces the old three everyDays(1).atHour() triggers and
+   never stacks duplicates.
 
    IMPORTANT: time-based triggers always run the LATEST SAVED project code — you
    do NOT need to redeploy the Web App after editing Code.gs for the reminder to
-   pick up changes; just Save. You only need to run setupShiftReminders() again
-   if the three triggers are missing (e.g. none were ever installed, or they
-   were deleted in the Triggers page). Changing a Script Property
-   (REMIND_WHEN_EMPTY / REMIND_INCLUDE_BLOCKED / SLACK_WEBHOOK_URL) also takes
-   effect immediately with no redeploy and no re-run of this function.
+   pick up changes; just Save. Re-run setupShiftReminders() once to migrate off
+   the old atHour triggers (it deletes them automatically). Changing a Script
+   Property (REMIND_WHEN_EMPTY / REMIND_INCLUDE_BLOCKED / SLACK_WEBHOOK_URL)
+   takes effect immediately with no redeploy and no re-run of this function.
    ============================================================ */
 function setupShiftReminders() {
-  // Remove any existing triggers for sendUrgentReminder first (idempotent).
+  // Remove ALL existing triggers for both handlers first (idempotent migration
+  // off the old three atHour sendUrgentReminder triggers).
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'sendUrgentReminder') ScriptApp.deleteTrigger(t);
+    var fn = t.getHandlerFunction();
+    if (fn === 'shiftReminderTick' || fn === 'sendUrgentReminder') ScriptApp.deleteTrigger(t);
   });
-  [5, 13, 22].forEach(function (h) {
-    ScriptApp.newTrigger('sendUrgentReminder').timeBased().everyDays(1).atHour(h).create();
-  });
-  return 'Installed shift-start reminders at 5 AM / 1 PM / 10 PM PHT.';
+  ScriptApp.newTrigger('shiftReminderTick').timeBased().everyMinutes(30).create();
+  return 'Installed 30-min shift reminder tick; posts at 5 AM / 1 PM / 10 PM PHT, deduped.';
 }
 
 /* ============================================================

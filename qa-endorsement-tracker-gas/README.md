@@ -48,6 +48,7 @@ Open **Project Settings &rsaquo; Script Properties &rsaquo; Add script property*
 | `REMIND_INCLUDE_BLOCKED` | `true` to also remind about **Blocked** AXOs | Optional (default `false`) |
 | `REMIND_WHEN_EMPTY` | `false` to stay silent when nothing is open; otherwise the reminder posts a short **all-clear** heartbeat | Optional (**default `true`**) |
 | `DRIVE_FOLDER_ID` | — | Auto-managed; leave unset |
+| `LAST_SHIFT_POSTED` | — | Auto-managed by `shiftReminderTick`; **don't edit** (clear it to force a re-post) |
 
 **Make a Slack Incoming Webhook:** Slack &rsaquo; *Your apps* &rsaquo; create/select an
 app &rsaquo; **Incoming Webhooks** &rsaquo; *Add New Webhook to Workspace* &rsaquo; pick a
@@ -78,30 +79,47 @@ To tighten or loosen access later, edit the manifest's `webapp.access`
 ## 5. Install the scheduled reminders
 
 In the editor, select the function **`setupShiftReminders`** and **Run** it **once**
-(authorize if prompted). It installs three native daily time-triggers that post a
-start-of-shift reminder of any open **Urgent/High Prio** AXOs (plus **Blocked** when
+(authorize if prompted). It installs **one** native time-trigger —
+`shiftReminderTick` running **every 30 minutes** — and posts a start-of-shift
+reminder of any open **Urgent/High Prio** AXOs (plus **Blocked** when
 `REMIND_INCLUDE_BLOCKED=true`). If none are open it posts a short **all-clear**
 heartbeat so a quiet shift still confirms the schedule is working — set
 `REMIND_WHEN_EMPTY=false` if you'd rather it stay silent on an empty shift.
 
-The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT**:
+**Timezone-proof by design.** `shiftReminderTick` computes the current
+**Asia/Manila** date and hour **itself** (`Utilities.formatDate(…, 'Asia/Manila', …)`),
+so the project/manifest time-zone setting **no longer matters** for the reminder. On
+each tick it maps the Manila hour to the shift currently due and posts once per shift
+start:
 
-| Shift | PHT start | Trigger |
+| Shift | PHT start | Due when Manila hour is |
 |---|---|---|
-| Day | 5:00 AM | `atHour(5)` |
-| Mid | 1:00 PM | `atHour(13)` |
-| Night | 10:00 PM | `atHour(22)` |
+| Day | 5:00 AM | 5–12 |
+| Mid | 1:00 PM | 13–21 |
+| Night | 10:00 PM | 22–23, or 0–4 (counted as the **previous** day's Night) |
 
-> Apps Script time-triggers fire within the given hour (not exactly on the minute).
-> Re-running `setupShiftReminders` is safe — it deletes existing `sendUrgentReminder`
-> triggers first, then recreates the three.
+Each shift is posted **exactly once**: the tick builds a shift key
+`<YYYY-MM-DD>:<Shift>` and records it in Script Property **`LAST_SHIFT_POSTED`**. If
+the current due shift is already recorded, the tick does nothing; otherwise it posts
+and records the key. This replaces the old three `everyDays(1).atHour()` daily
+triggers, which fired in a fuzzy window and silently depended on the project time
+zone (so the **5 AM** reminder could be skipped entirely). The 30-minute cadence
+reliably catches each shift-start hour, and the dedupe prevents any double-post.
+
+> **Re-run `setupShiftReminders` once to migrate.** It first deletes **all** existing
+> triggers for both `shiftReminderTick` **and** the old `sendUrgentReminder` handler,
+> then creates the single 30-minute tick — so re-running cleanly removes the old three
+> `atHour` triggers automatically and never stacks duplicates.
+>
+> `LAST_SHIFT_POSTED` is managed automatically — **don't edit it**. To force a re-post
+> for the current shift, clear that property (or run `sendUrgentReminder` manually from
+> the editor).
 >
 > Time-triggers always run the **latest saved** project code, so editing `Code.gs`
 > or changing a Script Property takes effect immediately — **no redeploy** and no
-> re-run of `setupShiftReminders` needed. Only re-run it if the three triggers are
-> missing (check **Triggers** in the editor sidebar). Each run writes diagnostics
-> (open counts, whether the webhook is set, the Slack response code) to the
-> **Executions** tab.
+> re-run of `setupShiftReminders` needed. Each run writes diagnostics (the Manila time,
+> the due shift key, whether it posted or skipped, open counts, whether the webhook is
+> set, the Slack response code) to the **Executions** tab.
 
 ## 6. Access & security notes
 
@@ -200,9 +218,13 @@ The manifest `timeZone` is **Asia/Manila**, so the trigger hours are **local PHT
   header, Urgent/High Prio AXOs up top, per-section counts). A failed post never fails
   the save. Edits don't post. The header **"Copy latest as Slack"** button is
   unchanged (client-side clipboard).
-- **Reminders (server-side).** `sendUrgentReminder` derives each AXO's current status
-  with the same `deriveAxos` logic as the client and posts the open Urgent/High Prio
-  (and optionally Blocked) AXOs at each shift start via the native time-triggers.
+- **Reminders (server-side).** A single `shiftReminderTick` time-trigger runs every 30
+  minutes, computes the current **Asia/Manila** date/hour itself, derives the due shift
+  start, and — deduping via Script Property `LAST_SHIFT_POSTED` so each shift posts
+  exactly once — calls `sendUrgentReminder`, which derives each AXO's current status with
+  the same `deriveAxos` logic as the client and posts the open Urgent/High Prio (and
+  optionally Blocked) AXOs. This is timezone-proof, so the project time-zone setting no
+  longer affects whether the 5 AM / 1 PM / 10 PM PHT reminders fire.
 
 The pure functions (`deriveAxos`, `buildSlackAlert`, status→section mapping, etc.) are
 **copied verbatim** into `Code.gs`, so the server and client produce identical text.
