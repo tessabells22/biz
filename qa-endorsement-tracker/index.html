@@ -1,0 +1,3012 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NPD QA Endorsement Tracker</title>
+<style>
+  /* ============================================================
+     DESIGN TOKENS — ShipERP brand (NPD QA)
+     Layout: utilitarian enterprise dashboard — a LIGHT ShipERP app bar
+     carrying the logo lockup, a surface tab strip below it, tabbed views,
+     summary-before-detail.
+     Two colour channels, kept apart:
+       • BRAND chrome — sampled from the ShipERP reference tool screenshot
+         ("NPD Test File Drafter"): navy #2A3B5A (headings, "Ship" wordmark,
+         icon), brand blue #2E6DB4 (the "ERP" wordmark, links, active tab,
+         info pills), and the signature amber accent #F19305 (the logo
+         underline + primary action buttons). Primary buttons use a deep
+         warm ink label (#2A1A00) on the amber for WCAG AA — the reference's
+         white-on-amber is ~2.4:1 and fails; dark-on-amber is ~7:1.
+       • STATUS (semantic) — a separate channel carried with a label/glyph,
+         never colour-alone. Kept INTACT and distinct. In Progress is nudged
+         to a cyan-azure (#0E80C7) so it does not collide with the royal
+         brand blue; the brand amber stays clear of the burnt "Urgent" orange.
+     Hex values here were SAMPLED from the ShipERP reference tool screenshot
+     (not the live site) — see the table in SETUP.md.
+     ============================================================ */
+  :root{
+    color-scheme: light;
+    --plane:#F3F5F7;        /* app background plane (light cool grey) */
+    --surface:#ffffff;      /* cards */
+    --surface-2:#EDF1F6;    /* subtle fills, table stripes, inputs */
+    --fg:#1F2D3D;
+    --fg-2:#44566a;
+    --muted:#61707F;
+    --grid:#EAEFF4;
+    --baseline:#cbd5e0;
+    --border:rgba(34,48,79,0.12);   /* ~#E3E8EE hairline */
+
+    /* ShipERP brand chrome (sampled) */
+    --brand:#2A3B5A;        /* brand navy — icon, "Ship" wordmark, badges */
+    --brand-deep:#1E2C45;   /* navy depth */
+    --brand-2:#2E6DB4;      /* brand blue — "ERP" wordmark, active tab, links */
+    --brand-2-ink:#215C9E;  /* brand blue ink — link/pill/tab text on light (AA) */
+    --brand-fg:#ffffff;     /* text on brand (navy) surfaces */
+
+    /* ShipERP amber accent (primary buttons, focus, accent numbers) */
+    --brand-orange:#F19305;
+    --accent:#F19305;
+    --accent-ink:#A15F02;   /* amber ink for small accent text on light (AA) */
+    --accent-fg:#2A1A00;    /* deep warm ink label ON amber buttons (AA ~7:1) */
+
+    /* info / tag pill */
+    --pill-bg:#DDEBF8;
+    --pill-fg:#215C9E;
+    /* number badge (navy, white text, both themes) */
+    --num-bg:#2A3B5A; --num-fg:#ffffff;
+    --shadow:0 1px 2px rgba(13,27,42,0.06), 0 2px 8px rgba(13,27,42,0.05);
+
+    /* status channel (semantic, separate from the brand) */
+    --st-nottested:#6b6a65;
+    --st-inprogress:#0E80C7;   /* nudged to cyan-azure, distinct from brand blue */
+    --st-monitoring:#9a6a00;
+    --st-urgent:#c85a26;
+    --st-blocked:#4a3aa7;
+    --st-failed:#cc3838;
+    --st-passed:#0a7d2c;
+    --st-passed-initial:#08756b;  /* passed, initial stage — ready to promote to develop (teal, distinct from final green) */
+    --ok:#1E8E52;              /* success/check green (connected pill) */
+
+    /* categorical palette for NPD QA workload (dataviz default order) */
+    --cat-1:#0E80C7; --cat-2:#eb6834; --cat-3:#1baf7a; --cat-4:#eda100;
+    --cat-5:#e87ba4; --cat-6:#008300; --cat-7:#4a3aa7; --cat-8:#e34948;
+
+    --radius:10px;
+    --radius-sm:7px;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --plane:#0F141B;
+      --surface:#171E27;
+      --surface-2:#212C38;
+      --fg:#EAF0F6;
+      --fg-2:#AEBCCB;
+      --muted:#8A97A7;
+      --grid:#28333F;
+      --baseline:#3a4756;
+      --border:rgba(255,255,255,0.11);
+      --brand:#AFC4E4;        /* navy lifts to light-blue on dark for the wordmark/icon */
+      --brand-deep:#0c1f38;
+      --brand-2:#6FA8E6;      /* brand blue on dark */
+      --brand-2-ink:#9BC4F0;  /* link/pill/tab text on dark */
+      --brand-fg:#ffffff;
+      --brand-orange:#F5A623;
+      --accent:#F5A623;
+      --accent-ink:#E0962A;   /* amber accent text on dark (AA) */
+      --accent-fg:#2A1A00;    /* deep warm ink label ON amber buttons (AA ~8:1) */
+      --pill-bg:#1E3A5A;
+      --pill-fg:#9BC4F0;
+      --num-bg:#2F4660; --num-fg:#ffffff;
+      --shadow:0 1px 2px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.35);
+      --st-nottested:#a0a09a;
+      --st-inprogress:#35A0E0;
+      --st-monitoring:#eda100;
+      --st-urgent:#ec835a;
+      --st-blocked:#9085e9;
+      --st-failed:#e06a6a;
+      --st-passed:#2fb24f;
+      --st-passed-initial:#33c2ad;
+      --ok:#35B06E;
+      --cat-1:#35A0E0; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
+      --cat-5:#d55181; --cat-6:#2fb24f; --cat-7:#9085e9; --cat-8:#e66767;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --plane:#0F141B;
+    --surface:#171E27;
+    --surface-2:#212C38;
+    --fg:#EAF0F6;
+    --fg-2:#AEBCCB;
+    --muted:#8A97A7;
+    --grid:#28333F;
+    --baseline:#3a4756;
+    --border:rgba(255,255,255,0.11);
+    --brand:#AFC4E4;
+    --brand-deep:#0c1f38;
+    --brand-2:#6FA8E6;
+    --brand-2-ink:#9BC4F0;
+    --brand-fg:#ffffff;
+    --brand-orange:#F5A623;
+    --accent:#F5A623;
+    --accent-ink:#E0962A;
+    --accent-fg:#2A1A00;
+    --pill-bg:#1E3A5A;
+    --pill-fg:#9BC4F0;
+    --num-bg:#2F4660; --num-fg:#ffffff;
+    --shadow:0 1px 2px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.35);
+    --st-nottested:#a0a09a;
+    --st-inprogress:#35A0E0;
+    --st-monitoring:#eda100;
+    --st-urgent:#ec835a;
+    --st-blocked:#9085e9;
+    --st-failed:#e06a6a;
+    --st-passed:#2fb24f;
+    --st-passed-initial:#33c2ad;
+    --ok:#35B06E;
+    --cat-1:#35A0E0; --cat-2:#d95926; --cat-3:#199e70; --cat-4:#c98500;
+    --cat-5:#d55181; --cat-6:#2fb24f; --cat-7:#9085e9; --cat-8:#e66767;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--plane);
+    color:var(--fg);
+    font-family:var(--font);
+    font-size:14px;
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  [hidden]{display:none !important}
+  h1,h2,h3{margin:0;text-wrap:balance}
+  button{font-family:inherit;font-size:inherit;cursor:pointer}
+  a{color:var(--accent-ink)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+  /* ---------- App bar (ShipERP light brand surface) ---------- */
+  .appbar{
+    position:sticky;
+    top:env(safe-area-inset-top,0px);
+    z-index:40;
+    background:var(--plane);
+    border-bottom:1px solid var(--border);
+  }
+  .appbar-inner{
+    max-width:1180px;margin:0 auto;
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:12px 20px 11px;
+    color:var(--fg);
+  }
+
+  /* ShipERP logo lockup: cube icon + "ShipERP" wordmark + amber underline
+     + divider + "NPD QA" label — recreated from the reference screenshot. */
+  .brand{display:flex;align-items:center;gap:10px;min-width:0;text-decoration:none}
+  .brand .logo-mark{width:30px;height:30px;flex:none;display:block}
+  .brand .logo-mark .box{stroke:var(--brand)}
+  .brand .logo-mark .lid{stroke:var(--brand-2)}
+  .wm{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+  .wm-txt{font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1}
+  .wm-txt .ship{color:var(--brand)}
+  .wm-txt .erp{color:var(--brand-2)}
+  .wm-underline{height:3px;width:100%;min-width:34px;border-radius:2px;background:var(--brand-orange)}
+  .brand-div{width:1px;height:24px;background:var(--border);margin:0 1px;flex:none}
+  .brand-tag{font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+
+  .apptitle{min-width:0;display:flex;flex-direction:column;gap:1px;margin-right:auto;border-left:1px solid var(--border);padding-left:14px;margin-left:2px}
+  .apptitle h1{font-size:16px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;color:var(--fg)}
+  .apptitle .sub{font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .build-stamp{font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--muted);opacity:.75;border:1px solid var(--border);border-radius:5px;padding:0 5px;margin-left:2px;vertical-align:1px}
+
+  .pill-conn{
+    display:inline-flex;align-items:center;gap:7px;
+    font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;
+    border:1px solid var(--border);background:var(--surface);color:var(--fg-2);
+  }
+  .pill-conn .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+  .pill-conn.ok{color:var(--fg-2);border-color:color-mix(in srgb,var(--ok) 40%,var(--border))}
+  .pill-conn.ok .dot{background:var(--ok)}
+  .pill-conn.demo{border-color:color-mix(in srgb,var(--st-monitoring) 40%,var(--border))}
+  .pill-conn.demo .dot{background:var(--brand-orange)}
+
+  .iconbtn{
+    display:inline-flex;align-items:center;gap:7px;
+    border:1px solid var(--border);background:var(--surface);color:var(--fg-2);
+    padding:7px 12px;border-radius:8px;font-size:13px;font-weight:550;
+  }
+  .iconbtn:hover{background:var(--surface-2);color:var(--fg)}
+  .iconbtn.primary{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 88%,#fff 12%),var(--accent));border-color:color-mix(in srgb,var(--accent) 70%,#000 12%);color:var(--accent-fg);font-weight:700}
+  .iconbtn.primary:hover{filter:brightness(1.05)}
+  .iconbtn.square{padding:7px 10px}
+
+  /* ---------- Tabs (surface strip under the band) ---------- */
+  .tabs{
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+  }
+  .tabs-inner{
+    max-width:1180px;margin:0 auto;padding:0 20px;
+    display:flex;gap:4px;flex-wrap:wrap;
+  }
+  .tab{
+    border:0;background:transparent;color:var(--fg-2);
+    padding:11px 14px 12px;font-size:13.5px;font-weight:600;
+    border-bottom:2.5px solid transparent;border-radius:0;
+  }
+  .tab:hover{color:var(--fg)}
+  .tab[aria-selected="true"]{color:var(--brand-2-ink);border-bottom-color:var(--brand-2)}
+  .tab-new{color:var(--accent-ink)}
+  .tab-new[aria-selected="true"]{color:var(--brand-2-ink)}
+
+  /* ---------- Layout ---------- */
+  main{max-width:1180px;margin:0 auto;padding:20px 20px 64px;}
+  .view{display:block}
+  .section-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:4px 2px 14px}
+  .section-head h2{font-size:17px;font-weight:650;letter-spacing:-.01em}
+  .section-head .hint{font-size:12.5px;color:var(--muted)}
+
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+  .card-pad{padding:16px 18px}
+
+  /* ---------- Demo banner ---------- */
+  .banner{
+    max-width:1180px;margin:14px auto 0;padding:0 20px;
+  }
+  .banner-inner{
+    display:flex;gap:12px;align-items:flex-start;
+    background:color-mix(in srgb,var(--st-monitoring) 12%,var(--surface));
+    border:1px solid color-mix(in srgb,var(--st-monitoring) 40%,var(--border));
+    border-radius:var(--radius);padding:12px 14px;
+  }
+  .banner-inner .b-ic{flex:none;font-size:16px;line-height:1.3}
+  .banner-inner .b-txt{font-size:12.8px;color:var(--fg-2);min-width:0}
+  .banner-inner .b-txt b{color:var(--fg)}
+  .banner-inner .b-x{margin-left:auto;flex:none;border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;padding:2px 6px;border-radius:6px}
+  .banner-inner .b-x:hover{background:var(--surface-2);color:var(--fg)}
+
+  /* ---------- Stat tiles ---------- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:12px}
+  .tile{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 14px 13px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+    display:flex;flex-direction:column;gap:3px;text-align:left;width:100%;
+  }
+  .tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tc,var(--muted))}
+  .tile .t-val{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1}
+  .tile .t-lab{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--fg-2);font-weight:600}
+  .tile .t-lab .sdot{width:9px;height:9px;border-radius:50%;background:var(--tc);flex:none}
+  .tile:hover{border-color:color-mix(in srgb,var(--tc) 45%,var(--border))}
+
+  /* Below the tiles: "Needs attention now" (left, flexible) sits beside the
+     "NPD QA workload" card as a bounded right-hand rail. Under 900px the two
+     stack into one column (attention, then workload) — today's behaviour. */
+  .dash-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px;align-items:start}
+  @media(min-width:900px){.dash-grid{grid-template-columns:minmax(0,1fr) clamp(260px,26%,360px)}}
+
+  .attn-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:start}
+  @media(max-width:520px){.attn-cols{grid-template-columns:1fr}}
+  .attn{display:flex;flex-direction:column;padding:11px 11px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);border-top:3px solid var(--ac,var(--muted))}
+  .attn.ready{background:color-mix(in srgb,var(--ac) 6%,var(--surface));border-color:color-mix(in srgb,var(--ac) 28%,var(--border))}
+  .attn h3{font-size:12.5px;font-weight:650;letter-spacing:.01em;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .attn h3 .cnt{margin-left:auto;font-size:11px;font-weight:700;color:var(--surface);background:var(--ac,var(--muted));padding:1px 8px;border-radius:999px;min-width:20px;text-align:center;font-variant-numeric:tabular-nums}
+  .attn h3 .sdot{width:9px;height:9px;border-radius:50%;background:var(--ac)}
+  .attn .attn-note{font-size:10.5px;color:var(--muted);margin:0 0 9px;letter-spacing:.01em}
+  /* Cap each panel's list and scroll it internally so one long panel can't stretch
+     the whole row — panels stay compact and top-aligned (align-items:start above).
+     Thin accent-tinted scrollbar in both engines. */
+  .attn ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:250px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ac) 40%,var(--border)) transparent}
+  .attn ul::-webkit-scrollbar{width:9px}
+  .attn ul::-webkit-scrollbar-track{background:transparent}
+  .attn ul::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--ac) 38%,var(--border));border-radius:999px;border:2px solid var(--surface);background-clip:padding-box}
+  .attn ul::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--ac) 55%,var(--border));border:2px solid var(--surface);background-clip:padding-box}
+  .attn li button{
+    width:100%;text-align:left;border:1px solid var(--border);background:var(--surface-2);
+    border-radius:var(--radius-sm);padding:8px 10px;color:var(--fg);
+    display:flex;flex-direction:column;gap:5px;
+    transition:border-color .13s ease,background .13s ease,box-shadow .13s ease;
+  }
+  .attn li button:hover{border-color:color-mix(in srgb,var(--ac) 55%,var(--border));background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.07)}
+  .attn li .axo-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0;max-width:100%}
+  .attn li .axo-no{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--fg)}
+  /* The short status pill sits beside the AXO number and wraps onto its own line
+     (never past the card edge) when the two don't fit — respects the pill fix. */
+  .attn li .st{max-width:100%;white-space:normal;text-align:left}
+  .attn li .nt{font-size:11.5px;line-height:1.4;color:var(--fg-2);max-width:100%;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  /* Small context line — last QA · shift · date — below a hairline divider. */
+  .attn li .axo-meta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 7px;font-size:10.5px;
+    line-height:1.3;color:var(--fg-2);letter-spacing:.01em;font-variant-numeric:tabular-nums;
+    padding-top:5px;border-top:1px solid var(--border)}
+  .attn li .axo-meta .sep{color:var(--muted)}
+  .attn .empty{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;color:var(--muted);
+    padding:14px 10px;border:1px dashed var(--border);border-radius:var(--radius-sm);text-align:center}
+  .attn .empty .ok-ic{color:var(--st-passed);font-weight:700;font-size:13px;line-height:1}
+
+  /* ---------- Workload bars ---------- */
+  .wl{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+  .wl-row{display:grid;grid-template-columns:76px 1fr 34px;align-items:center;gap:10px}
+  .wl-name{font-size:12.5px;font-weight:600;color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wl-track{height:14px;background:var(--surface-2);border-radius:4px;position:relative;overflow:hidden}
+  .wl-fill{height:100%;border-radius:4px;background:var(--wc,var(--accent));min-width:4px;transition:width .5s ease}
+  .wl-val{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
+  .wl-axis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px;padding-left:86px}
+
+  /* ---------- Dashboard right rail: Snapshot + Latest handover, stacked above
+     the workload chart. The rail is the grid's second column; its cards keep the
+     same 16px rhythm and the column's bounded width, so nothing overflows. ---------- */
+  .dash-rail{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .snap-asof{font-size:12px;color:var(--muted);letter-spacing:.01em;font-variant-numeric:tabular-nums}
+  .snap-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .snap-stat{display:flex;flex-direction:column;gap:4px;padding:11px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);min-width:0}
+  .snap-stat .s-val{font-size:25px;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--fg);font-variant-numeric:tabular-nums}
+  .snap-stat .s-lab{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--fg-2);line-height:1.25}
+  .snap-stat .s-lab .sdot{width:8px;height:8px;border-radius:50%;background:var(--sc,var(--muted));flex:none}
+  .snap-stat.attn-stat{background:color-mix(in srgb,var(--st-urgent) 8%,var(--surface-2));border-color:color-mix(in srgb,var(--st-urgent) 30%,var(--border))}
+  /* Latest handover mini-card */
+  .handover{display:flex;flex-direction:column}
+  .ho-btn{display:flex;flex-direction:column;gap:9px;width:100%;text-align:left;background:none;border:0;padding:0;margin:0;cursor:pointer;color:inherit;font:inherit;border-radius:var(--radius-sm)}
+  .ho-when{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0}
+  .ho-date{font-size:15px;font-weight:700;color:var(--fg);font-variant-numeric:tabular-nums}
+  .ho-shift{font-size:12.5px;font-weight:650;color:var(--brand-2-ink)}
+  .ho-qa{font-size:12.5px;color:var(--fg-2)}
+  .ho-sep{color:var(--muted);font-size:11px}
+  .ho-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .ho-btn:hover .ho-date{text-decoration:underline;text-underline-offset:2px}
+  .ho-empty{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+  .ho-empty .ok-ic{color:var(--st-passed);font-weight:700;font-size:13px;line-height:1}
+
+  /* ---------- Status pill ---------- */
+  .st{
+    display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+    max-width:100%;box-sizing:border-box;vertical-align:middle;
+    font-size:11.5px;font-weight:650;line-height:1;padding:4px 9px 4px 7px;border-radius:999px;
+    color:var(--sc);background:color-mix(in srgb,var(--sc) 13%,var(--surface));
+    border:1px solid color-mix(in srgb,var(--sc) 34%,transparent);
+  }
+  .st .g{font-size:10px;line-height:1;flex:none}
+
+  /* ---------- Toolbar (tracker) ---------- */
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .toolbar .grow{flex:1 1 220px;min-width:0}
+  input,select,textarea{
+    font-family:inherit;font-size:13.5px;color:var(--fg);background:var(--surface);
+    border:1px solid var(--border);border-radius:8px;padding:8px 11px;width:100%;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+  textarea{resize:vertical;min-height:38px;line-height:1.4}
+  label.fld{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--fg-2)}
+  .search-wrap{position:relative;flex:1 1 240px;min-width:0}
+  .search-wrap input{padding-left:32px}
+  .search-wrap .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
+
+  /* ---------- Tracker table ---------- */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+  table.axo{width:100%;border-collapse:collapse;min-width:620px}
+  table.axo th{
+    text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
+    font-weight:650;padding:11px 14px;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface);
+    position:sticky;top:0;
+  }
+  table.axo th.sortable{cursor:pointer;user-select:none}
+  table.axo th.sortable:hover{color:var(--fg-2)}
+  table.axo th .arr{opacity:.5;font-size:9px}
+  table.axo td{padding:11px 14px;border-bottom:1px solid var(--grid);vertical-align:middle}
+  table.axo tr.axo-row{cursor:pointer}
+  table.axo tr.axo-row:hover td{background:var(--surface-2)}
+  table.axo tr.axo-row.open td{background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+  .axo-no{font-weight:650;font-variant-numeric:tabular-nums}
+  .axo-no .chev{display:inline-block;width:14px;color:var(--muted);transition:transform .15s}
+  tr.open .axo-no .chev{transform:rotate(90deg);color:var(--accent-ink)}
+  .cell-sub{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  td.touches{font-variant-numeric:tabular-nums;color:var(--fg-2)}
+  tr.hist-row td{padding:0;border-bottom:1px solid var(--grid);background:var(--surface-2)}
+  tr.hist-row .hist-inner{padding:6px 14px 14px 40px}
+
+  /* timeline */
+  .timeline{list-style:none;margin:8px 0 0;padding:0;position:relative}
+  .timeline::before{content:"";position:absolute;left:5px;top:6px;bottom:8px;width:2px;background:var(--grid)}
+  .tl-item{position:relative;padding:0 0 14px 24px}
+  .tl-item:last-child{padding-bottom:0}
+  .tl-item .tl-dot{position:absolute;left:0;top:3px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2.5px solid var(--sc,var(--muted));box-shadow:0 0 0 3px var(--surface-2)}
+  .tl-item.cur .tl-dot{background:var(--sc)}
+  .tl-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-bottom:3px}
+  .tl-meta .dt{font-weight:650;color:var(--fg-2);font-variant-numeric:tabular-nums}
+  .tl-meta .sec{color:var(--muted)}
+  .tl-note{font-size:13px;color:var(--fg);max-width:64ch}
+  .tl-cur-tag{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent-fg);background:var(--accent);padding:1px 6px;border-radius:4px}
+
+  /* ---------- Shift log ---------- */
+  .log-list{display:flex;flex-direction:column;gap:16px}
+  .endo{padding:0;overflow:hidden}
+  .endo-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+  .endo-head .e-title{font-size:14.5px;font-weight:650}
+  .endo-head .e-meta{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .endo-head .chip{font-size:10.5px;font-weight:650;padding:2px 9px;border-radius:999px;background:var(--pill-bg);border:1px solid color-mix(in srgb,var(--pill-fg) 22%,transparent);color:var(--pill-fg)}
+  .endo-head .e-actions{margin-left:auto;display:flex;gap:7px}
+  .endo-head .e-actions button{padding:5px 10px;font-size:12px}
+  .danger{color:var(--st-failed);border-color:color-mix(in srgb,var(--st-failed) 35%,var(--border))}
+  .danger:hover{background:color-mix(in srgb,var(--st-failed) 10%,var(--surface));color:var(--st-failed)}
+  .endo-body{padding:6px 18px 16px}
+  .sec-block{padding:11px 0;border-bottom:1px dashed var(--grid)}
+  .sec-block:last-child{border-bottom:0}
+  .sec-title{font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-2);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .sec-title .n{color:var(--accent-ink);font-variant-numeric:tabular-nums}
+  .sec-lines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+  .sec-lines li{display:flex;gap:10px;align-items:flex-start;font-size:13px}
+  .sec-lines li .lx{color:var(--muted);flex:none;margin-top:1px}
+  .sec-lines li .la{font-weight:650;font-variant-numeric:tabular-nums;flex:none;color:var(--accent-ink)}
+  .sec-lines li .ln{color:var(--fg);min-width:0}
+  .sec-lines li .lst{margin-left:auto;flex:none}
+  .sec-lines li .lfile{flex:none;color:var(--brand-2-ink)}
+  .sec-lines li a{color:var(--brand-2-ink);font-weight:600;text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--brand-2-ink) 40%,transparent)}
+  .sec-lines li a:hover{border-bottom-color:var(--brand-2-ink)}
+  .sec-lines li .lnote{color:var(--muted);font-size:12px}
+  .sec-empty{font-size:12px;color:var(--muted);font-style:italic}
+
+  /* ---------- Shift log: toolbar + filters ---------- */
+  .log-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .log-filters{display:flex;gap:8px;flex-wrap:wrap;flex:1 1 320px;min-width:0}
+  .log-search{flex:1 1 200px;min-width:0;padding:8px 11px;font-size:13px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--fg)}
+  .log-select{padding:8px 10px;font-size:12.5px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--fg)}
+  .log-expand-controls{display:flex;gap:7px;flex:none}
+  .log-expand-controls button{padding:7px 11px;font-size:12px}
+  @media(max-width:560px){.log-expand-controls{width:100%}.log-expand-controls button{flex:1}}
+
+  /* ---------- Shift log: date groups ---------- */
+  .log-group{margin-bottom:18px}
+  .log-group:last-child{margin-bottom:0}
+  .log-group-head{display:flex;align-items:baseline;gap:10px;padding:0 2px 8px;position:sticky;top:env(safe-area-inset-top,0px);z-index:2;background:var(--plane)}
+  .log-group-head .lg-date{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-2);font-variant-numeric:tabular-nums}
+  .log-group-head .lg-count{font-size:11px;color:var(--muted);font-weight:600}
+  .log-rows{display:flex;flex-direction:column;gap:8px}
+
+  /* ---------- Shift log: compact rows ---------- */
+  .endo-row{border:1px solid var(--border);border-radius:11px;background:var(--surface);overflow:hidden}
+  .endo-row.open{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));box-shadow:var(--shadow)}
+  .er-summary{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:11px 14px;background:none;border:0;cursor:pointer;color:inherit;font:inherit;min-width:0}
+  .er-summary:hover{background:var(--surface-2)}
+  .er-summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .er-caret{flex:none;color:var(--muted);font-size:11px;transition:transform .15s ease}
+  .endo-row.open .er-caret{transform:rotate(90deg)}
+  .er-badge{flex:none;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:var(--sb-bg,var(--surface-2));color:var(--sb-fg,var(--fg-2));border:1px solid color-mix(in srgb,var(--sb-fg,var(--muted)) 26%,var(--border))}
+  .er-badge.shift-Day{--sb-bg:color-mix(in srgb,var(--st-passed) 15%,transparent);--sb-fg:var(--st-passed)}
+  .er-badge.shift-Mid{--sb-bg:color-mix(in srgb,var(--st-urgent) 15%,transparent);--sb-fg:var(--st-urgent)}
+  .er-badge.shift-Night{--sb-bg:color-mix(in srgb,var(--brand-2-ink) 16%,transparent);--sb-fg:var(--brand-2-ink)}
+  .er-name{flex:none;font-size:13.5px;font-weight:650;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40%}
+  .er-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto;justify-content:flex-end;min-width:0}
+  .cchip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--sc,var(--fg-2));background:color-mix(in srgb,var(--sc,var(--muted)) 13%,transparent);border:1px solid color-mix(in srgb,var(--sc,var(--muted)) 32%,transparent)}
+  .cchip b{font-weight:800;font-variant-numeric:tabular-nums}
+  .cchip.file{color:var(--brand-2-ink);background:var(--surface-2);border-color:var(--border)}
+  .cchip.muted{color:var(--muted);background:var(--surface-2);border-color:var(--border);font-style:italic}
+  @media(max-width:560px){
+    .er-summary{flex-wrap:wrap}
+    .er-name{max-width:none;flex:1 1 auto}
+    .er-chips{margin-left:0;width:100%;justify-content:flex-start;margin-top:2px}
+  }
+  .endo-detail{border-top:1px solid var(--border);background:var(--surface-2)}
+  .endo-detail .endo-body{padding:4px 16px 8px}
+  .endo-detail-actions{display:flex;gap:7px;justify-content:flex-end;padding:0 16px 14px}
+  .endo-detail-actions button{padding:5px 10px;font-size:12px}
+  .log-loadmore{display:flex;justify-content:center;margin-top:16px}
+  .log-loadmore button{padding:9px 18px;font-size:12.5px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+  /* ---------- Form ---------- */
+  .form-head{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+    padding:16px 18px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:var(--radius);margin-bottom:6px;
+  }
+  @media(max-width:680px){.form-head{grid-template-columns:1fr}}
+  .fsec{
+    margin-top:14px;padding:14px 16px;border:1px solid var(--border);
+    border-radius:var(--radius);background:var(--surface);
+  }
+  .fsec::before{content:"";display:block;height:3px;width:34px;border-radius:2px;
+    background:var(--sc,var(--brand-2));margin-bottom:11px}
+  .fsec-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
+  .fsec-head h3{font-size:13.5px;font-weight:650;letter-spacing:-.005em;line-height:1.3}
+  .fsec-head .n{
+    flex:none;display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;
+    font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;
+    color:var(--num-fg);background:var(--num-bg);border-radius:6px;
+  }
+  .fsec-head .addln{margin-left:auto;flex:none}
+  .fsec-head .addln button{padding:5px 10px;font-size:12px;white-space:nowrap}
+  .fsec-hint{font-size:11.5px;color:var(--muted);margin:0 0 10px 32px;max-width:72ch;line-height:1.4}
+  .lines{display:flex;flex-direction:column;gap:8px}
+  .line-row{display:grid;grid-template-columns:116px 1fr 168px 34px;gap:8px;align-items:center}
+  .line-row.nonaxo{grid-template-columns:1fr 34px}
+  .line-row.file-row{grid-template-columns:150px 1fr 1fr 34px}
+  @media(max-width:680px){
+    .line-row{grid-template-columns:1fr 1fr;}
+    .line-row .note-cell{grid-column:1/3}
+    .line-row.nonaxo{grid-template-columns:1fr 40px}
+    .line-row.file-row{grid-template-columns:1fr 40px}
+    .line-row.file-row input{grid-column:1/2}
+    .line-row.file-row .rm-line{grid-row:1;grid-column:2}
+  }
+  .lines-empty{font-size:12px;color:var(--muted);font-style:italic;padding:2px 2px 4px}
+  .rm-line{border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:7px;padding:7px 0;font-size:15px;line-height:1;height:36px}
+  .rm-line:hover{color:var(--st-failed);border-color:color-mix(in srgb,var(--st-failed) 35%,var(--border))}
+  .form-actions{
+    display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;
+    position:sticky;bottom:env(safe-area-inset-bottom,0px);z-index:5;
+    padding:12px 16px;background:color-mix(in srgb,var(--surface) 88%,transparent);
+    backdrop-filter:blur(6px);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+  .form-actions .sp{margin-left:auto}
+  .form-actions .hint{font-size:12px;color:var(--muted)}
+
+  /* ---------- Unified AXO row builder ---------- */
+  #endoForm{max-width:780px}
+  .builder-main{min-width:0;display:flex;flex-direction:column;gap:14px}
+
+  /* quick add control */
+  .qa-add{padding:14px 16px}
+  .qa-add-row{display:grid;grid-template-columns:128px 182px minmax(0,1fr) auto;gap:8px;align-items:center}
+  .qa-add-row .qa-note{min-width:0}
+  @media(max-width:620px){
+    .qa-add-row{grid-template-columns:1fr 1fr}
+    .qa-add-row .qa-note{grid-column:1/3}
+    .qa-add-row #qAdd{grid-column:1/3}
+  }
+  .qa-add-hint{margin:9px 2px 0;font-size:11.5px;color:var(--muted);line-height:1.4}
+  .qa-add-hint kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:0 5px}
+
+  /* added rows, grouped by derived section */
+  .brow-group{display:flex;flex-direction:column;gap:9px}
+  .brow-group + .brow-group{margin-top:16px}
+  .brow-group-h{font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fg-2);display:flex;align-items:center;gap:8px;line-height:1.3}
+  .brow-group-h .n{color:var(--accent-ink);font-variant-numeric:tabular-nums;flex:none}
+  .brow-group-h .brow-cnt{margin-left:auto;flex:none;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);padding:1px 8px;border-radius:999px;min-width:20px;text-align:center}
+  .brows{display:flex;flex-direction:column;gap:8px}
+  .brow{display:grid;grid-template-columns:116px 174px minmax(0,1fr) 34px;gap:8px;align-items:center;
+    border-left:3px solid var(--sc,var(--muted));padding:6px 0 6px 11px}
+  .brow .b-note{min-width:0}
+  @media(max-width:620px){
+    .brow{grid-template-columns:1fr 1fr}
+    .brow .b-note{grid-column:1/3}
+    .brow .b-rm{grid-row:1;grid-column:2;justify-self:end;width:40px}
+  }
+  .builder-empty{font-size:13px;color:var(--muted);text-align:center;padding:30px 18px;
+    border:1px dashed var(--border);border-radius:var(--radius);background:var(--surface-2)}
+  .builder-empty b{color:var(--fg-2);font-weight:600}
+
+  /* collapsible extras */
+  .extras{display:flex;flex-direction:column;gap:12px}
+  .extra{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+  .extra > summary{list-style:none;cursor:pointer;padding:12px 16px;font-size:12.5px;font-weight:650;color:var(--fg-2);display:flex;align-items:center;gap:10px}
+  .extra > summary::-webkit-details-marker{display:none}
+  .extra > summary::before{content:"\25B8";color:var(--muted);font-size:11px;transition:transform .15s;flex:none}
+  .extra[open] > summary::before{transform:rotate(90deg)}
+  .extra > summary:hover{color:var(--fg)}
+  .extra > summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .extra .ex-cnt{margin-left:auto;flex:none;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);padding:1px 8px;border-radius:999px;min-width:20px;text-align:center}
+  .extra-body{padding:12px 16px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:11px}
+  .extra-body .fsec-hint{margin:0 0 2px}
+  .extra-body .add-ln{align-self:flex-start}
+
+  /* live Slack preview */
+  .preview-h .pdot,.preview-panel > summary .pdot{width:8px;height:8px;border-radius:50%;background:var(--brand-2);flex:none}
+  .preview-pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;color:var(--fg);max-height:52vh;overflow:auto;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 12px}
+  .preview-note{font-size:11px;color:var(--muted);margin:0;line-height:1.4}
+  /* collapsible preview panel (reuses .extra chrome) */
+  .preview-panel{margin-top:2px}
+  .preview-panel > summary{color:var(--fg-2)}
+  .preview-body{gap:10px}
+
+  /* ---------- File upload (Needs Continuation Test File Upload) ---------- */
+  .filedrop{
+    display:flex;flex-direction:column;gap:3px;align-items:flex-start;
+    border:1.5px dashed var(--border);border-radius:var(--radius-sm);
+    background:var(--surface-2);padding:13px 14px;
+  }
+  .filedrop.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--surface))}
+  .filedrop .fd-main{font-size:12.8px;color:var(--fg-2)}
+  .filedrop .fd-cap{font-size:11px;color:var(--fg-2);line-height:1.4}
+  .linklike{border:0;background:transparent;color:var(--brand-2-ink);font-weight:650;padding:0;text-decoration:underline;font-size:inherit}
+  .linklike:hover{color:var(--brand-2)}
+  .file-chip{
+    display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1.3fr) 34px;gap:9px;align-items:center;
+    border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);padding:7px 9px;
+  }
+  .file-chip .fc-ic{flex:none;color:var(--brand-2-ink)}
+  .file-chip .fc-meta{min-width:0;display:flex;flex-direction:column;gap:1px}
+  .file-chip .fc-name{font-size:12.8px;font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .file-chip .fc-sub{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  @media(max-width:620px){
+    .file-chip{grid-template-columns:auto minmax(0,1fr) 40px}
+    .file-chip .fc-note{grid-column:1/4}
+  }
+
+  /* ---------- Empty state ---------- */
+  .empty-state{text-align:center;padding:52px 20px;color:var(--muted)}
+  .empty-state .es-ic{font-size:34px;opacity:.5}
+  .empty-state h3{font-size:16px;color:var(--fg);margin:10px 0 4px}
+  .empty-state p{font-size:13px;max-width:42ch;margin:0 auto 16px}
+
+  /* ---------- Toasts ---------- */
+  .toasts{position:fixed;right:16px;bottom:16px;z-index:90;display:flex;flex-direction:column;gap:8px;max-width:min(360px,90vw)}
+  .toast{
+    background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);
+    border-radius:8px;padding:11px 14px;box-shadow:var(--shadow);font-size:13px;color:var(--fg);
+    display:flex;gap:10px;align-items:flex-start;animation:tin .22s ease;
+  }
+  .toast.err{border-left-color:var(--st-failed)}
+  .toast.ok{border-left-color:var(--st-passed)}
+  @keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+
+  /* ---------- Modal ---------- */
+  .modal-bg{position:fixed;inset:0;z-index:80;background:rgba(11,11,11,0.5);display:grid;place-items:center;padding:20px}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.3);max-width:620px;width:100%;max-height:88vh;overflow:auto}
+  .modal-head{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)}
+  .modal-head h2{font-size:16px;font-weight:650}
+  .modal-head .x{margin-left:auto;border:0;background:transparent;color:var(--muted);font-size:22px;line-height:1;padding:2px 8px;border-radius:6px}
+  .modal-head .x:hover{background:var(--surface-2);color:var(--fg)}
+  .modal-body{padding:18px 20px 22px}
+  .modal-body h3{font-size:13px;margin:16px 0 7px;color:var(--fg)}
+  .modal-body h3:first-child{margin-top:0}
+  .modal-body p{font-size:13px;color:var(--fg-2);margin:0 0 10px;max-width:60ch}
+  .schema{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 4px}
+  .schema th,.schema td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--grid)}
+  .schema th{color:var(--muted);text-transform:uppercase;font-size:10.5px;letter-spacing:.03em}
+  .schema code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:5px}
+  .sample-note{font-size:11.5px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border:1px dashed var(--border);border-radius:999px;background:var(--surface-2)}
+</style>
+</head>
+<body>
+  <header class="appbar">
+    <div class="appbar-inner">
+      <a class="brand" href="#dashboard" aria-label="ShipERP — NPD QA">
+        <svg class="logo-mark" viewBox="0 0 32 32" width="30" height="30" role="img" aria-hidden="true"
+             fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+          <path class="box" d="M4.5 10 L4.5 22 L16 28.5 L27.5 22 L27.5 10"/>
+          <path class="box" d="M16 16.5 L16 28.5"/>
+          <path class="lid" d="M4.5 10 L16 3.5 L27.5 10 L16 16.5 Z"/>
+          <path class="lid" d="M16 3.5 L16 9"/>
+        </svg>
+        <span class="wm">
+          <span class="wm-txt"><span class="ship">Ship</span><span class="erp">ERP</span></span>
+          <span class="wm-underline"></span>
+        </span>
+        <span class="brand-div"></span>
+        <span class="brand-tag">NPD QA</span>
+      </a>
+      <div class="apptitle">
+        <h1>NPD QA Endorsement Tracker</h1>
+        <div class="sub">Endorsement of Tasks &middot; shared shift handover <span class="build-stamp" id="buildStamp" title="Deployed build"></span></div>
+      </div>
+      <span id="connPill" class="pill-conn"><span class="dot"></span><span id="connText">Connecting…</span></span>
+      <button class="iconbtn primary" id="copyBtn" title="Copy the latest endorsement in Slack handover format">⧉ Copy latest as Slack</button>
+      <button class="iconbtn square" id="refreshBtn" title="Re-fetch from the backend">⟳ Refresh</button>
+      <button class="iconbtn square" id="themeBtn" title="Toggle light / dark">◐</button>
+      <button class="iconbtn square" id="helpBtn" title="Setup &amp; help">?</button>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <div class="tabs-inner">
+        <button class="tab" role="tab" data-tab="dashboard" aria-selected="true">Dashboard</button>
+        <button class="tab" role="tab" data-tab="tracker" aria-selected="false">AXO Tracker</button>
+        <button class="tab" role="tab" data-tab="log" aria-selected="false">Shift Log</button>
+        <button class="tab tab-new" role="tab" data-tab="new" aria-selected="false">+ New Endorsement</button>
+      </div>
+    </nav>
+  </header>
+
+  <div class="banner" id="demoBanner" hidden>
+    <div class="banner-inner">
+      <span class="b-ic">◐</span>
+      <div class="b-txt">
+        <b>Demo mode — sample data.</b> No SharePoint site was detected, so the tracker is showing
+        built-in example endorsements saved only in this browser. Changes you make here persist locally
+        and are not shared with the team. To connect the shared list, host <b>index.html</b> on your
+        SharePoint site and follow <b>SETUP.md</b> (or set <code>SP_CONFIG.siteUrl</code> at the top of the file).
+      </div>
+      <button class="b-x" id="bannerX" aria-label="Dismiss">&times;</button>
+    </div>
+  </div>
+
+  <main>
+    <section class="view" id="view-dashboard"></section>
+    <section class="view" id="view-tracker" hidden></section>
+    <section class="view" id="view-log" hidden></section>
+    <section class="view" id="view-new" hidden></section>
+  </main>
+
+  <div class="toasts" id="toasts"></div>
+
+  <div class="modal-bg" id="helpModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modal-head">
+        <h2 id="helpTitle">Setup &amp; help</h2>
+        <button class="x" id="helpX" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>This tracker reads and writes a single SharePoint list so the whole NPD QA team edits one shared
+        copy. Each "Endorsement of Tasks" handover is stored as one list item; all of its sections and
+        its file references are kept as JSON in one text column, so list setup stays trivial.</p>
+        <h3>SharePoint list: <code>QAEndorsements</code></h3>
+        <table class="schema">
+          <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>Title</code></td><td>Single line of text</td><td>Shift label, e.g. "2025-09-30 Night — Juan"</td></tr>
+            <tr><td><code>ShiftDate</code></td><td>Date and Time (or ISO text)</td><td>The shift date</td></tr>
+            <tr><td><code>Shift</code></td><td>Choice / single line</td><td>Day &middot; Mid &middot; Night</td></tr>
+            <tr><td><code>QAResource</code></td><td>Single line of text</td><td>QA who logged it</td></tr>
+            <tr><td><code>Payload</code></td><td>Multiple lines of plain text</td><td><code>JSON.stringify({sections, fileRefs})</code> — all handover sections plus the "Needs Continuation Test File Upload" references (links, SharePoint attachments, or inline demo files)</td></tr>
+          </tbody>
+        </table>
+        <h3>Connect it</h3>
+        <p>Upload <code>index.html</code> to a document library (e.g. Site Assets) and surface it via a
+        File Viewer / Embed / Content Editor web part, or link to it as a page. When the page is served
+        from SharePoint it auto-detects the site from the page context. If auto-detect does not apply,
+        set <code>SP_CONFIG.siteUrl</code> near the top of the file. Full steps are in <b>SETUP.md</b>
+        next to this file.</p>
+        <h3>Permissions</h3>
+        <p>List <b>Contribute</b> = can log and edit endorsements. <b>Read</b> = view only.</p>
+        <h3>Demo vs connected</h3>
+        <p>Connected mode reads and writes the live list. Demo mode (no site context) uses sample data
+        saved to this browser so you can preview the tool anywhere; it is clearly labelled and never
+        touches SharePoint.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ============================================================
+   SP_CONFIG — the ONE place to edit for your tenant.
+   Leave siteUrl empty to auto-detect from the SharePoint page
+   context (_spPageContextInfo.webAbsoluteUrl) when hosted on SP.
+   ============================================================ */
+const SP_CONFIG = {
+  siteUrl: '',                 // e.g. 'https://contoso.sharepoint.com/sites/QA'
+  listName: 'QAEndorsements',
+  // OPTIONAL Slack notification. Leave empty to keep it OFF (default). When set to a
+  // Slack Incoming Webhook URL, saving a NEW endorsement AUTOMATICALLY posts a concise
+  // "new endorsement added" alert (shift header, per-section counts, and any
+  // Urgent/High Prio AXOs listed up top) to that channel. Edits do not post, to avoid
+  // noise. WARNING: a webhook URL placed here is visible in the page source to anyone
+  // who can open the file — only use it for an internal/trusted-audience page, and note
+  // it fires only for saves made through this page. For a server-side credential that
+  // fires for ALL sources (any client, not just this page), prefer a Power Automate
+  // on-create flow instead — and use only ONE route to avoid double posts
+  // (see SETUP.md → Slack notifications).
+  slackWebhookUrl: '',         // e.g. 'https://hooks.slack.com/services/T000/B000/XXXX'
+  // OPTIONAL status mirror. Leave empty to keep it OFF (default). When set to the name
+  // of a SharePoint helper list, a successful Save in Connected mode UPSERTS one row per
+  // AXO touched by the endorsement (its current status), so a SCHEDULED Power Automate
+  // flow can read it and remind the team of Urgent/High Prio AXOs on a timer. Best-effort
+  // and non-blocking: if the list is absent or an upsert fails, the save still succeeds.
+  // Demo (local) mode skips the mirror entirely. See SETUP.md → Scheduled reminder.
+  axoStatusListName: 'QAAxoStatus'   // '' = feature disabled
+};
+
+/* ============================================================
+   PURE LOGIC (also unit-tested) START
+   No DOM / browser references in this block (ends at the END marker below).
+   ============================================================ */
+
+/* Deployed build stamp — shown in the header so anyone can confirm at a glance
+   whether the copy they are looking at is the latest deploy. Bump on each ship. */
+const BUILD = '2026-10-08.7';
+
+const STATUSES = [
+  { key:'Not Tested',                   token:'--st-nottested',      glyph:'○' },
+  { key:'In Progress',                  token:'--st-inprogress',     glyph:'◐' },
+  { key:'Passed - Initial',             token:'--st-passed-initial', glyph:'↗', short:'Passed · Initial' },
+  { key:'Passed - Develop/Deployment',  token:'--st-passed',         glyph:'✓', short:'Passed · Dev/Deploy' },
+  { key:'Failed - Initial',             token:'--st-failed',         glyph:'✕', short:'Failed · Initial' },
+  { key:'Failed - Develop/Deployment',  token:'--st-failed',         glyph:'✕', short:'Failed · Dev/Deploy' },
+  { key:'Needs Monitoring',             token:'--st-monitoring',     glyph:'◉' },
+  { key:'Urgent/High Prio',             token:'--st-urgent',         glyph:'▲' },
+  { key:'Blocked',                      token:'--st-blocked',        glyph:'■' },
+  /* Legacy values — still RECOGNIZED (pills render, dashboard buckets them) but
+     no longer OFFERED in the entry builder dropdown. Old/live data may hold them. */
+  { key:'Failed',                       token:'--st-failed',         glyph:'✕', legacy:true },
+  { key:'Passed',                       token:'--st-passed',         glyph:'✓', legacy:true }
+];
+
+/* Section definitions mirror the real Slack "Endorsement of Tasks" modal.
+   `title` is the verbatim Slack field label (used as-is in the Shift Log and the
+   Slack-copy output). `lead` + `hint` split that same label for the guided form:
+   `lead` is the bold heading, `hint` is the parenthetical shown as subtle helper
+   text — together they reproduce the verbatim label. `num` is the field's
+   position in the Slack form (Date = 1, QA Resource = 2, then the sections; the
+   file-upload field is 5, defined separately as FILE_FIELD). `defaultStatus` is
+   the per-AXO status this section seeds (overridable by the user). */
+const SECTIONS = [
+  { key:'workedOn', num:3, axo:true, defaultStatus:'In Progress',
+    title:'Worked On during Shift and Status',
+    lead:'Worked On during Shift and Status', hint:'' },
+  { key:'needsMonitoring', num:4, axo:true, defaultStatus:'Needs Monitoring',
+    title:"Needs Monitoring for Develop/Deployment Server - (AXOs that are already in the canvass but hasn't been crossed out)",
+    lead:'Needs Monitoring for Develop/Deployment Server',
+    hint:"AXOs that are already in the canvass but hasn't been crossed out" },
+  { key:'blocker', num:6, axo:true, defaultStatus:'Blocked',
+    title:'Blocker Issue that needs Urgency (Include the affected AXO No. if any and the Title raised in Blocker for easy search)',
+    lead:'Blocker Issue that needs Urgency',
+    hint:'Include the affected AXO No. if any and the Title raised in Blocker for easy search' },
+  { key:'urgent', num:7, axo:true, defaultStatus:'Urgent/High Prio',
+    title:'Urgent and High Prio',
+    lead:'Urgent and High Prio', hint:'' },
+  { key:'notTested', num:8, axo:true, defaultStatus:'Not Tested',
+    title:'Not Yet Tested',
+    lead:'Not Yet Tested', hint:'' },
+  { key:'nonAxo', num:9, axo:false,
+    title:'Non AXO Related but needs Attention - Regression, end-to-end ETC',
+    lead:'Non AXO Related but needs Attention', hint:'Regression, end-to-end ETC' }
+];
+
+/* The one non-AXO, non-section field: a per-endorsement list of file references
+   (field 5 in the Slack form). Rendered between "Needs Monitoring" (4) and
+   "Blocker Issue" (6) everywhere. */
+const FILE_FIELD = {
+  num:5,
+  title:'Needs Continuation Test File Upload',
+  lead:'Needs Continuation Test File Upload',
+  hint:'Hand off the file(s) the next shift should keep testing — drag in or choose files to upload, or paste a link. Add an optional note to each.'
+};
+
+/* Ordered render blocks for the Shift Log, form, and Slack copy: sections in
+   Slack order with the file field spliced in at position 5. */
+function orderedBlocks(){
+  const blocks = [];
+  for (const s of SECTIONS){
+    blocks.push({ type:'section', section:s });
+    if (s.key === 'needsMonitoring') blocks.push({ type:'file', field:FILE_FIELD });
+  }
+  return blocks;
+}
+
+function defaultStatusFor(sectionKey){
+  const s = SECTIONS.find(x => x.key === sectionKey);
+  return (s && s.defaultStatus) || 'Not Tested';
+}
+
+/* Ordered AXO-section keys (Slack order), used to flatten a stored endorsement
+   into builder rows and back. */
+const AXO_SECTION_KEYS = SECTIONS.filter(s => s.axo).map(s => s.key);
+
+/* STATUS → stored section key. In the unified row builder, picking a status is
+   what files an AXO into a section bucket. This is the SAME bucket the old
+   sectioned form used, so the stored payload, derivation, Shift Log and
+   Slack-copy output are all unchanged. In Progress, the Passed/Failed stage
+   variants, and the legacy Passed/Failed all live under "Worked On during Shift
+   and Status". */
+const STATUS_SECTION = {
+  'Not Tested':                  'notTested',
+  'In Progress':                 'workedOn',
+  'Passed - Initial':            'workedOn',
+  'Passed - Develop/Deployment': 'workedOn',
+  'Failed - Initial':            'workedOn',
+  'Failed - Develop/Deployment': 'workedOn',
+  'Passed':                      'workedOn',  // legacy
+  'Failed':                      'workedOn',  // legacy
+  'Needs Monitoring':            'needsMonitoring',
+  'Urgent/High Prio':            'urgent',
+  'Blocked':                     'blocker'
+};
+function sectionForStatus(status){
+  return STATUS_SECTION[status] || 'workedOn';
+}
+
+/* Flatten a stored endorsement into the builder's working draft:
+     { rows:[{axo,status,note,section}], nonAxo:[{note}], fileRefs:[{name,url,note}] }
+   Each AXO row carries the section key it currently lives in, so an unchanged
+   round-trip is lossless; changing a row's status re-routes it via
+   sectionForStatus. */
+function draftFromModel(model){
+  const rows = [];
+  const sections = (model && model.sections) || {};
+  AXO_SECTION_KEYS.forEach(key => {
+    const list = Array.isArray(sections[key]) ? sections[key] : [];
+    list.forEach(r => {
+      if (!r) return;
+      rows.push({
+        axo: String(r.axo == null ? '' : r.axo),
+        status: r.status || defaultStatusFor(key),
+        note: r.note || '',
+        section: key
+      });
+    });
+  });
+  const nonAxo = (Array.isArray(sections.nonAxo) ? sections.nonAxo : [])
+    .map(r => ({ note: (r && r.note) || '' }));
+  const fileRefs = fileRefsOf(model).map(r => ({
+    kind: r.kind, name: r.name || '', url: r.url || '', note: r.note || '',
+    dataUrl: r.dataUrl || '',
+    // _existing marks an attachment already on the server (Connected edit); _file
+    // is a pending browser File awaiting upload. Neither is serialized to payload.
+    _existing: r.kind === 'attachment', _file: null,
+    _size: r.kind === 'data' ? Math.round(((r.dataUrl || '').length) * 0.75) : 0
+  }));
+  return { rows, nonAxo, fileRefs };
+}
+
+/* Serialize a header + builder draft back into the stored endorsement payload
+   shape. AXO rows bucket by their section key (kept in sync with status); empty
+   rows are dropped. This is the one place Save and the live preview both use, so
+   preview === Copy output. */
+function buildModelFromDraft(header, draft){
+  const sections = {};
+  SECTIONS.forEach(s => { sections[s.key] = []; });
+  (draft.rows || []).forEach(r => {
+    const axo = (r.axo || '').trim();
+    const note = (r.note || '').trim();
+    if (!axo && !note) return;
+    const status = r.status || 'Not Tested';
+    const key = r.section || sectionForStatus(status);
+    (sections[key] || (sections[key] = [])).push({ axo, note, status });
+  });
+  sections.nonAxo = (draft.nonAxo || [])
+    .map(n => ({ note: (n.note || '').trim() }))
+    .filter(n => n.note);
+  const fileRefs = (draft.fileRefs || []).map(f => {
+    const name = (f.name || '').trim();
+    const note = (f.note || '').trim();
+    if (f.kind === 'attachment') return (name || note) ? { kind:'attachment', name, note } : null;
+    if (f.kind === 'data')       return (f.dataUrl || name || note)
+      ? { kind:'data', name, note, dataUrl: f.dataUrl || '' } : null;
+    const url = (f.url || '').trim();
+    return (name || url || note) ? { kind:'link', name, url, note } : null;
+  }).filter(Boolean);
+  return {
+    shiftDate: header.shiftDate || '',
+    shift: header.shift || 'Day',
+    qaResource: (header.qaResource || '').trim(),
+    sections,
+    fileRefs
+  };
+}
+
+/* A file reference is one of three kinds, all stored in the same `fileRefs`
+   payload array:
+     • link       { kind:'link', name, url, note }   — paste a URL (original behavior)
+     • attachment { kind:'attachment', name, note }   — a real SharePoint list-item
+                                                        attachment (Connected mode)
+     • data       { kind:'data', name, note, dataUrl }— a base64 data: URL kept
+                                                        inline (Demo / local mode)
+   Legacy entries saved before kinds existed had no `kind` and only {name,url,note};
+   they are read as links so old items keep working. */
+function normalizeFileRef(r){
+  if (!r || typeof r !== 'object') return null;
+  const name = r.name || '';
+  const note = r.note || '';
+  if (r.kind === 'attachment') return { kind:'attachment', name, note };
+  if (r.kind === 'data')       return { kind:'data', name, note, dataUrl: r.dataUrl || '' };
+  // 'link' or legacy (no kind)
+  return { kind:'link', name, url: r.url || '', note };
+}
+
+/* Normalize an endorsement's file references, one canonical kind-tagged item each. */
+function fileRefsOf(e){
+  return (Array.isArray(e && e.fileRefs) ? e.fileRefs : []).map(normalizeFileRef).filter(Boolean);
+}
+
+/* Avoid clobbering an attachment of the same name already on the item (or earlier
+   in the same batch): "report.har" → "report (2).har" → "report (3).har". */
+function dedupeFileName(name, used){
+  if (!used.has(name)) return name;
+  const dot = name.lastIndexOf('.');
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext  = dot > 0 ? name.slice(dot) : '';
+  let i = 2, cand;
+  do { cand = `${base} (${i})${ext}`; i++; } while (used.has(cand));
+  return cand;
+}
+
+/* Per-file size cap for Demo (local) mode, where files are stored inline as
+   base64 in localStorage. Keeps a single file from blowing the storage quota. */
+const DEMO_FILE_CAP = 1.5 * 1024 * 1024; // 1.5 MB
+
+/* Human file size for chips / cap messages. */
+function fmtSize(bytes){
+  const n = Number(bytes) || 0;
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+  return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function shiftRank(shift){
+  return shift === 'Day' ? 0 : shift === 'Mid' ? 1 : shift === 'Night' ? 2 : 3;
+}
+
+/* Zero-pad y/m/d into a canonical 'YYYY-MM-DD' string. */
+function isoDay_(y, mo, da){
+  return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (da < 10 ? '0' : '') + da;
+}
+
+/* Normalize ANY ShiftDate representation to a canonical, lexicographically
+   sortable 'YYYY-MM-DD' calendar day — whether the value arrives as a plain
+   'YYYY-MM-DD' string, an ISO datetime with a Z or +08:00 offset, a Date object,
+   or a locale string. The SAME normalized value feeds both the displayed date
+   and the sort key, so the timeline and the ordering can never disagree. For any
+   string that begins with a 'YYYY-MM-DD' we take that literal day (timezone-free,
+   so an offset can never flip the calendar date). An unparseable value becomes ''
+   which sorts before every real date and can never silently equal one. */
+function normDate(v){
+  if (v === null || v === undefined) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]'){
+    if (isNaN(v.getTime())) return '';
+    return isoDay_(v.getFullYear(), v.getMonth() + 1, v.getDate());
+  }
+  var s = String(v).trim();
+  if (!s) return '';
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) return isoDay_(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  return '';
+}
+
+/* Aggregate every AXO entry across all endorsements, group by AXO number,
+   sort chronologically (shiftDate, then Day<Mid<Night, then endorsement order,
+   then line order). Current status = most recent entry's status. */
+function deriveAxos(endorsements){
+  const sectionTitleByKey = {};
+  SECTIONS.forEach(s => { if (s.axo) sectionTitleByKey[s.key] = s.title; });
+
+  const map = new Map();
+  let push = 0;
+  const list = endorsements.map((e, i) => ({ e, seq: (typeof e._seq === 'number' ? e._seq : i) }));
+
+  for (const { e, seq } of list){
+    const sections = e.sections || {};
+    const nd = normDate(e.shiftDate); // canonical day — drives BOTH display and sort
+    for (const secKey of Object.keys(sectionTitleByKey)){
+      const rows = Array.isArray(sections[secKey]) ? sections[secKey] : [];
+      for (const r of rows){
+        if (!r || r.axo === undefined || r.axo === null) continue;
+        const axo = String(r.axo).trim();
+        if (!axo) continue;
+        if (!map.has(axo)) map.set(axo, []);
+        map.get(axo).push({
+          axo,
+          date: nd,
+          shift: e.shift,
+          qaResource: e.qaResource || '',
+          section: sectionTitleByKey[secKey],
+          sectionKey: secKey,
+          note: r.note || '',
+          status: r.status || 'Not Tested',
+          _date: nd,
+          _shift: shiftRank(e.shift),
+          _seq: seq,
+          _ord: push++
+        });
+      }
+    }
+  }
+
+  const out = [];
+  for (const [axo, steps] of map){
+    steps.sort((a, b) => {
+      if (a._date !== b._date) return a._date < b._date ? -1 : 1;
+      if (a._shift !== b._shift) return a._shift - b._shift;
+      if (a._seq !== b._seq) return a._seq - b._seq;
+      return a._ord - b._ord;
+    });
+    const last = steps[steps.length - 1];
+    out.push({
+      axo,
+      current: last.status,
+      lastDate: last.date,
+      lastShift: last.shift,
+      lastQA: last.qaResource,
+      touches: steps.length,
+      history: steps
+    });
+  }
+  out.sort((a, b) => {
+    if (a.lastDate !== b.lastDate) return a.lastDate < b.lastDate ? 1 : -1;
+    return shiftRank(b.lastShift) - shiftRank(a.lastShift);
+  });
+  return out;
+}
+
+/* Distinct AXOs each QA worked on, across the endorsements that QA authored
+   (contribution, not current ownership). An AXO a QA logged across several of
+   their own shifts counts ONCE for that QA; an AXO worked on by two QAs counts
+   for BOTH, so the summed total may exceed the Total AXOs count (expected for a
+   contribution view). Every QA who authored at least one endorsement is
+   included, even one whose AXOs were all re-touched by a later shift. */
+function computeWorkload(endorsements){
+  const axoSectionKeys = SECTIONS.filter(s => s.axo).map(s => s.key);
+  const byQA = {};
+  for (const e of endorsements){
+    const qa = (e.qaResource || '').trim() || 'Unassigned';
+    if (!byQA[qa]) byQA[qa] = new Set();
+    const sections = e.sections || {};
+    for (const secKey of axoSectionKeys){
+      const rows = Array.isArray(sections[secKey]) ? sections[secKey] : [];
+      for (const r of rows){
+        if (!r || r.axo === undefined || r.axo === null) continue;
+        const axo = String(r.axo).trim();
+        if (axo) byQA[qa].add(axo);
+      }
+    }
+  }
+  return Object.keys(byQA)
+    .map(qa => ({ qa, count: byQA[qa].size }))
+    .sort((a, b) => b.count - a.count || a.qa.localeCompare(b.qa));
+}
+
+/* Count of AXOs by current status. */
+function statusCounts(derived){
+  const c = {};
+  STATUSES.forEach(s => { c[s.key] = 0; });
+  derived.forEach(a => { c[a.current] = (c[a.current] || 0) + 1; });
+  return c;
+}
+
+/* ---- On-save Slack alert + status mirror helpers (pure, unit-tested) ----
+   These read a single endorsement MODEL (header + sections), not the derived set. */
+
+/* Count AXO lines per section, plus non-AXO notes and file references, for the
+   concise "new endorsement" alert summary line. */
+function sectionCounts(model){
+  const s = (model && model.sections) || {};
+  const c = {};
+  SECTIONS.forEach(sec => { c[sec.key] = Array.isArray(s[sec.key]) ? s[sec.key].length : 0; });
+  c.files = fileRefsOf(model).length;
+  return c;
+}
+
+/* The Urgent/High Prio AXO rows in this endorsement (by status, across all AXO
+   sections), so the alert can list them up top. */
+function urgentRowsOf(model){
+  const s = (model && model.sections) || {};
+  const out = [];
+  AXO_SECTION_KEYS.forEach(key => {
+    (Array.isArray(s[key]) ? s[key] : []).forEach(r => {
+      if (r && r.status === 'Urgent/High Prio') out.push(r);
+    });
+  });
+  return out;
+}
+
+/* The AXOs TOUCHED by this endorsement, each with the status just entered — one
+   entry per AXO (last occurrence wins). Drives the current-status mirror upsert;
+   returns [] for an endorsement with no AXO rows. */
+function touchedAxoStatuses(model){
+  const s = (model && model.sections) || {};
+  const map = new Map();
+  AXO_SECTION_KEYS.forEach(key => {
+    (Array.isArray(s[key]) ? s[key] : []).forEach(r => {
+      if (!r) return;
+      const axo = String(r.axo == null ? '' : r.axo).trim();
+      if (!axo) return;
+      map.set(axo, { axo, status: r.status || defaultStatusFor(key), note: r.note || '', section: key });
+    });
+  });
+  return Array.from(map.values());
+}
+
+/* Concise "new endorsement added" alert for the auto-post: shift header, any
+   Urgent/High Prio AXOs listed up top, then a one-line per-section count summary.
+   (The full six-section post stays with buildSlackText / "Copy latest as Slack".)
+   opts.updated prefixes "(updated)" for the optional edit-post case. */
+function buildSlackAlert(model, opts){
+  if (!model) return '';
+  const prefix = (opts && opts.updated) ? '(updated) ' : '';
+  const lines = [];
+  lines.push(`📋 *${prefix}New QA Endorsement — ${model.shiftDate} · ${model.shift} · ${model.qaResource}*`);
+  const urgent = urgentRowsOf(model);
+  if (urgent.length){
+    lines.push(`🚨 *Urgent / High Prio (${urgent.length}):*`);
+    urgent.forEach(r => lines.push(`• AXO ${r.axo || '—'}${r.note ? ' — ' + r.note : ''}`));
+  }
+  const c = sectionCounts(model);
+  lines.push('_' + [
+    `Worked On ${c.workedOn}`,
+    `Needs Monitoring ${c.needsMonitoring}`,
+    `Blocker ${c.blocker}`,
+    `Urgent/High Prio ${c.urgent}`,
+    `Not Tested ${c.notTested}`,
+    `Non-AXO ${c.nonAxo}`,
+    `Files ${c.files}`
+  ].join(' · ') + '_');
+  return lines.join('\n').trim();
+}
+
+/* Sample data for demo mode only — clearly labelled as sample in the UI.
+   8 endorsements, 16 unique AXOs. AXO 15226 has a 5-step journey ending
+   `Passed - Develop/Deployment` (so it lands under Passed). Current statuses are
+   seeded to showcase the staged flow:
+     • `Passed - Initial`  → 15210, 15260  (populate "For possible deployment to develop")
+     • Passed (final)      → 15226 & 15164 (`Passed - Develop/Deployment`) + 15188 (legacy `Passed`)
+     • Failed              → 15201 (`Failed - Develop/Deployment`) — also shown under Needs Monitoring
+     • Blocked             → 15192, 15175
+     • Urgent/High Prio    → 15099, 15277   • Needs Monitoring → 15241, 15118, 15305
+     • Not Tested          → 15233, 15150, 15312
+   Legacy flat `Passed`/`Failed` also appear in historical steps to prove they
+   still parse. */
+const SEED_ENDORSEMENTS = [
+  { id:'seed-e1', _seq:0, shiftDate:'2025-09-30', shift:'Day', qaResource:'Juan',
+    sections:{
+      workedOn:[
+        { axo:'15192', note:'Picking up checkout refactor QA', status:'In Progress' },
+        { axo:'15210', note:'Login accessibility fixes verified', status:'Passed' }
+      ],
+      needsMonitoring:[],
+      blocker:[ { axo:'15226', note:'Retest failed — payment webhook still returns 500', status:'Failed' } ],
+      urgent:[],
+      notTested:[ { axo:'15233', note:'New dark-mode settings page, not yet covered', status:'Not Tested' } ],
+      nonAxo:[ { note:'Refreshed the regression suite docs in Confluence' } ]
+    },
+    fileRefs:[
+      { name:'15226_payment_webhook_trace.har', url:'https://contoso.sharepoint.com/sites/QA/Shared%20Documents/15226_payment_webhook_trace.har', note:'500 error capture — continue from request #42' }
+    ] },
+  { id:'seed-e2', _seq:1, shiftDate:'2025-09-30', shift:'Mid', qaResource:'Priya',
+    sections:{
+      workedOn:[ { axo:'15241', note:'Cart promo-code validation', status:'In Progress' } ],
+      needsMonitoring:[ { axo:'15226', note:'Hotfix deployed, watching the 5xx error rate', status:'Needs Monitoring' } ],
+      blocker:[],
+      urgent:[ { axo:'15099', note:'Prod hotfix verification — password reset emails', status:'Urgent/High Prio' } ],
+      notTested:[
+        { axo:'15175', note:'Vendor payout report — awaiting test data', status:'Not Tested' },
+        { axo:'15118', note:'Bulk CSV import screen', status:'Not Tested' }
+      ],
+      nonAxo:[]
+    },
+    fileRefs:[] },
+  { id:'seed-e3', _seq:2, shiftDate:'2025-09-30', shift:'Night', qaResource:'Marco',
+    sections:{
+      workedOn:[ { axo:'15260', note:'Search filters regression green', status:'Passed' } ],
+      needsMonitoring:[
+        { axo:'15226', note:'Error rate back to baseline, re-running regression', status:'In Progress' },
+        { axo:'15305', note:'Intermittent timeout on report export', status:'Needs Monitoring' }
+      ],
+      blocker:[],
+      urgent:[],
+      notTested:[ { axo:'15150', note:'New onboarding checklist flow', status:'Not Tested' } ],
+      nonAxo:[]
+    },
+    fileRefs:[] },
+  { id:'seed-e7', _seq:3, shiftDate:'2025-09-30', shift:'Night', qaResource:'Aisha',
+    sections:{
+      workedOn:[ { axo:'15188', note:'Email template rendering verified across clients', status:'Passed' } ],
+      needsMonitoring:[],
+      blocker:[],
+      urgent:[
+        { axo:'15201', note:'Checkout 500s under load — needs priority retest', status:'Urgent/High Prio' },
+        { axo:'15277', note:'Audit log export — escalated, blocking release sign-off', status:'Urgent/High Prio' }
+      ],
+      notTested:[],
+      nonAxo:[ { note:'Smoke-tested the staging deploy at 02:00, all green' } ]
+    },
+    fileRefs:[] },
+  { id:'seed-e4', _seq:4, shiftDate:'2025-10-01', shift:'Day', qaResource:'Aisha',
+    sections:{
+      workedOn:[ { axo:'15210', note:'Login accessibility — initial pass green, ready to promote to develop', status:'Passed - Initial' } ],
+      needsMonitoring:[ { axo:'15241', note:'Promo-code edge cases still flaky', status:'Needs Monitoring' } ],
+      blocker:[ { axo:'15175', note:'Blocked: waiting on 3rd-party sandbox credentials from vendor', status:'Blocked' } ],
+      urgent:[],
+      notTested:[ { axo:'15312', note:'New notification preferences panel', status:'Not Tested' } ],
+      nonAxo:[]
+    },
+    fileRefs:[
+      { name:'promo_code_edge_cases.xlsx', url:'', note:'Flaky scenarios checklist — rows 8-14 still open' }
+    ] },
+  { id:'seed-e8', _seq:5, shiftDate:'2025-10-01', shift:'Day', qaResource:'Marco',
+    sections:{
+      workedOn:[ { axo:'15164', note:'Profile avatar upload verified on develop/deployment', status:'Passed - Develop/Deployment' } ],
+      needsMonitoring:[ { axo:'15118', note:'CSV import — watching memory use on large files', status:'Needs Monitoring' } ],
+      blocker:[],
+      urgent:[],
+      notTested:[],
+      nonAxo:[]
+    },
+    fileRefs:[] },
+  { id:'seed-e5', _seq:6, shiftDate:'2025-10-01', shift:'Mid', qaResource:'Juan',
+    sections:{
+      workedOn:[ { axo:'15260', note:'Search filters — initial pass green, ready to promote to develop', status:'Passed - Initial' } ],
+      needsMonitoring:[],
+      blocker:[ { axo:'15192', note:'Blocked: staging DB migration failing, cannot seed test data', status:'Blocked' } ],
+      urgent:[ { axo:'15099', note:'Password reset emails failing again in prod — needs urgent retest this shift', status:'Urgent/High Prio' } ],
+      notTested:[ { axo:'15226', note:'New build dropped, awaiting a fresh test pass', status:'Not Tested' } ],
+      nonAxo:[]
+    },
+    fileRefs:[] },
+  { id:'seed-e6', _seq:7, shiftDate:'2025-10-01', shift:'Night', qaResource:'Priya',
+    sections:{
+      workedOn:[ { axo:'15226', note:'Full regression green, signed off on develop/deployment', status:'Passed - Develop/Deployment' } ],
+      needsMonitoring:[ { axo:'15305', note:'Report export timeout still intermittent overnight', status:'Needs Monitoring' } ],
+      blocker:[],
+      urgent:[ { axo:'15201', note:'Checkout load retest failed — 500s persist at 200 RPS', status:'Failed - Develop/Deployment' } ],
+      notTested:[ { axo:'15150', note:'Onboarding checklist — still queued', status:'Not Tested' } ],
+      nonAxo:[]
+    },
+    fileRefs:[
+      { name:'15201_load_test_results.pdf', url:'https://contoso.sharepoint.com/sites/QA/Shared%20Documents/15201_load_test_results.pdf', note:'200 RPS run — 500s start at ~3 min, hand to day shift' }
+    ] }
+];
+/* ============================================================
+   PURE LOGIC END
+   ============================================================ */
+
+/* ============================================================
+   SHAREPOINT REST DATA LAYER
+   Standard SP REST — works on SharePoint Online / modern pages & classic.
+   ============================================================ */
+function resolveSiteUrl(){
+  if (SP_CONFIG.siteUrl) return SP_CONFIG.siteUrl.replace(/\/$/, '');
+  try {
+    if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo && _spPageContextInfo.webAbsoluteUrl){
+      return _spPageContextInfo.webAbsoluteUrl.replace(/\/$/, '');
+    }
+  } catch (e) {}
+  return '';
+}
+
+const SP = {
+  site(){ return resolveSiteUrl(); },
+  list(){ return SP_CONFIG.listName; },
+  itemsBase(){ return `${this.site()}/_api/web/lists/getbytitle('${encodeURIComponent(this.list())}')/items`; },
+
+  async getDigest(){
+    const res = await fetch(`${this.site()}/_api/contextinfo`, {
+      method:'POST',
+      headers:{ 'Accept':'application/json;odata=nometadata' },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('contextinfo ' + res.status);
+    const data = await res.json();
+    return data.FormDigestValue;
+  },
+
+  async getItems(){
+    const url = `${this.itemsBase()}?$select=Id,Title,ShiftDate,Shift,QAResource,Payload&$top=5000&$orderby=ShiftDate desc`;
+    const res = await fetch(url, {
+      method:'GET',
+      headers:{ 'Accept':'application/json;odata=nometadata' },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('getItems ' + res.status);
+    const data = await res.json();
+    return (data.value || []).map(spToModel);
+  },
+
+  async addItem(model){
+    const digest = await this.getDigest();
+    const res = await fetch(this.itemsBase(), {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'Content-Type':'application/json;odata=nometadata',
+        'X-RequestDigest': digest
+      },
+      credentials:'same-origin',
+      body: JSON.stringify(modelToSp(model))
+    });
+    if (!res.ok) throw new Error('addItem ' + res.status);
+    return spToModel(await res.json());
+  },
+
+  async updateItem(model){
+    const digest = await this.getDigest();
+    const res = await fetch(`${this.itemsBase()}(${model.id})`, {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'Content-Type':'application/json;odata=nometadata',
+        'X-RequestDigest': digest,
+        'IF-MATCH':'*',
+        'X-HTTP-Method':'MERGE'
+      },
+      credentials:'same-origin',
+      body: JSON.stringify(modelToSp(model))
+    });
+    if (!res.ok) throw new Error('updateItem ' + res.status);
+    return model;
+  },
+
+  async deleteItem(id){
+    const digest = await this.getDigest();
+    const res = await fetch(`${this.itemsBase()}(${id})`, {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'X-RequestDigest': digest,
+        'IF-MATCH':'*',
+        'X-HTTP-Method':'DELETE'
+      },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('deleteItem ' + res.status);
+    return true;
+  },
+
+  /* ---- List-item attachments (real binary uploads) ----
+     Attachments hang off an existing item, so adds happen AFTER the item is
+     saved and we know its Id. Requires the list to have Attachments enabled and
+     the user to have Contribute. */
+  async listAttachments(id){
+    const url = `${this.itemsBase()}(${id})/AttachmentFiles?$select=FileName,ServerRelativeUrl`;
+    const res = await fetch(url, {
+      method:'GET',
+      headers:{ 'Accept':'application/json;odata=nometadata' },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('listAttachments ' + res.status);
+    const data = await res.json();
+    return (data.value || []).map(a => ({ name: a.FileName, url: a.ServerRelativeUrl || '' }));
+  },
+
+  async addAttachment(id, fileName, arrayBuffer){
+    const digest = await this.getDigest();
+    const url = `${this.itemsBase()}(${id})/AttachmentFiles/add(FileName='${encodeURIComponent(fileName)}')`;
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'X-RequestDigest': digest
+      },
+      credentials:'same-origin',
+      body: arrayBuffer          // raw binary body
+    });
+    if (!res.ok) throw new Error('addAttachment ' + res.status);
+    return true;
+  },
+
+  async deleteAttachment(id, fileName){
+    const digest = await this.getDigest();
+    const url = `${this.itemsBase()}(${id})/AttachmentFiles/getByFileName('${encodeURIComponent(fileName)}')`;
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'X-RequestDigest': digest,
+        'IF-MATCH':'*',
+        'X-HTTP-Method':'DELETE'
+      },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('deleteAttachment ' + res.status);
+    return true;
+  },
+
+  /* ---- Current-status mirror list (QAAxoStatus) ----
+     An OPTIONAL helper list holding one row per AXO with its CURRENT status, so a
+     scheduled Power Automate flow can read it and remind the team of Urgent/High
+     Prio AXOs on a timer. Standard REST with a fresh digest per write. */
+  axoStatusList(){ return SP_CONFIG.axoStatusListName; },
+  axoStatusBase(){ return `${this.site()}/_api/web/lists/getbytitle('${encodeURIComponent(this.axoStatusList())}')/items`; },
+
+  /* Look an AXO up by its AxoNumber text column. Returns the matching item (or null). */
+  async findAxoStatus(axo){
+    const safe = String(axo).replace(/'/g, "''");
+    const url = `${this.axoStatusBase()}?$select=Id,AxoNumber&$filter=AxoNumber eq '${encodeURIComponent(safe)}'&$top=1`;
+    const res = await fetch(url, {
+      method:'GET',
+      headers:{ 'Accept':'application/json;odata=nometadata' },
+      credentials:'same-origin'
+    });
+    if (!res.ok) throw new Error('findAxoStatus ' + res.status);
+    const data = await res.json();
+    return (data.value && data.value[0]) || null;
+  },
+
+  async addAxoStatus(fields){
+    const digest = await this.getDigest();
+    const res = await fetch(this.axoStatusBase(), {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'Content-Type':'application/json;odata=nometadata',
+        'X-RequestDigest': digest
+      },
+      credentials:'same-origin',
+      body: JSON.stringify(fields)
+    });
+    if (!res.ok) throw new Error('addAxoStatus ' + res.status);
+    return true;
+  },
+
+  async updateAxoStatus(id, fields){
+    const digest = await this.getDigest();
+    const res = await fetch(`${this.axoStatusBase()}(${id})`, {
+      method:'POST',
+      headers:{
+        'Accept':'application/json;odata=nometadata',
+        'Content-Type':'application/json;odata=nometadata',
+        'X-RequestDigest': digest,
+        'IF-MATCH':'*',
+        'X-HTTP-Method':'MERGE'
+      },
+      credentials:'same-origin',
+      body: JSON.stringify(fields)
+    });
+    if (!res.ok) throw new Error('updateAxoStatus ' + res.status);
+    return true;
+  }
+};
+
+/* Payload JSON holds BOTH the sections and the file references:
+     { "sections": { … }, "fileRefs": [ {name,url,note}, … ] }
+   Legacy items that stored sections at the top level (no "sections" key) are
+   still read correctly, with an empty fileRefs list. */
+function spToModel(item){
+  let parsed = {};
+  try { parsed = JSON.parse(item.Payload || '{}'); } catch (e) { parsed = {}; }
+  const sections = (parsed && typeof parsed.sections === 'object' && parsed.sections) ? parsed.sections : parsed;
+  const fileRefs = Array.isArray(parsed && parsed.fileRefs) ? parsed.fileRefs : [];
+  SECTIONS.forEach(s => { if (!Array.isArray(sections[s.key])) sections[s.key] = []; });
+  let date = item.ShiftDate || '';
+  if (date && date.length > 10) date = date.slice(0, 10);
+  return {
+    id: item.Id,
+    title: item.Title || '',
+    shiftDate: date,
+    shift: item.Shift || 'Day',
+    qaResource: item.QAResource || '',
+    sections,
+    fileRefs
+  };
+}
+
+function modelToSp(model){
+  return {
+    Title: model.title || buildTitle(model),
+    ShiftDate: model.shiftDate ? model.shiftDate + 'T00:00:00Z' : null,
+    Shift: model.shift,
+    QAResource: model.qaResource,
+    Payload: JSON.stringify({ sections: model.sections || {}, fileRefs: model.fileRefs || [] })
+  };
+}
+
+function buildTitle(m){
+  return `${m.shiftDate || ''} ${m.shift || ''} — ${m.qaResource || ''}`.trim();
+}
+
+/* ============================================================
+   STORAGE INTERFACE — dispatches to SharePoint or localStorage.
+   UI code is identical in both modes.
+   ============================================================ */
+const LS_KEY = 'qaEndorsements.v2';
+
+function lsRead(){
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+function lsWrite(list){
+  try { localStorage.setItem(LS_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+const store = {
+  mode: 'demo', // 'sharepoint' | 'demo'
+
+  async detect(){
+    const site = resolveSiteUrl();
+    if (site){
+      try {
+        const items = await SP.getItems();
+        this.mode = 'sharepoint';
+        return items;
+      } catch (e) {
+        this.mode = 'demo';
+        toast('Could not reach the SharePoint list — showing demo data. ' + e.message, 'err');
+      }
+    }
+    this.mode = 'demo';
+    let list = lsRead();
+    if (!list){
+      list = SEED_ENDORSEMENTS.map(e => JSON.parse(JSON.stringify(e)));
+      lsWrite(list);
+    }
+    return list;
+  },
+
+  async list(){
+    if (this.mode === 'sharepoint') return SP.getItems();
+    const list = lsRead() || [];
+    return list;
+  },
+
+  async add(model){
+    if (this.mode === 'sharepoint') return SP.addItem(model);
+    const list = lsRead() || [];
+    model.id = 'loc-' + Date.now() + '-' + Math.floor(Math.random() * 1e4);
+    model.title = model.title || buildTitle(model);
+    list.push(model);
+    lsWrite(list);
+    return model;
+  },
+
+  async update(model){
+    if (this.mode === 'sharepoint') return SP.updateItem(model);
+    const list = lsRead() || [];
+    const i = list.findIndex(e => String(e.id) === String(model.id));
+    model.title = model.title || buildTitle(model);
+    if (i >= 0) list[i] = model; else list.push(model);
+    lsWrite(list);
+    return model;
+  },
+
+  async remove(id){
+    if (this.mode === 'sharepoint') return SP.deleteItem(id);
+    const list = (lsRead() || []).filter(e => String(e.id) !== String(id));
+    lsWrite(list);
+    return true;
+  }
+};
+
+/* ============================================================
+   APP STATE + UI
+   ============================================================ */
+const state = {
+  endorsements: [],
+  derived: [],
+  loadedAt: null,        // set each time endorsements are (re)loaded — drives the Snapshot "as of" line
+  activeTab: 'dashboard',
+  sortKey: 'lastDate',
+  sortDir: 'desc',
+  search: '',
+  statusFilter: 'all',
+  expanded: new Set(),
+  editingId: null,
+  draft: { rows: [], nonAxo: [], fileRefs: [] },
+  log: { window: 12, text: '', shift: 'All', qa: 'All', expanded: new Set() }
+};
+
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function statusMeta(key){ return STATUSES.find(s => s.key === key) || STATUSES[0]; }
+function statusPill(key){
+  const m = statusMeta(key);
+  // Compact UI pill: show the short label when defined, full label always in the
+  // tooltip. Stored values and Slack output keep the full key (see buildSlackText).
+  const label = m.short || m.key;
+  return `<span class="st" style="--sc:var(${m.token})" title="${esc(m.key)}"><span class="g">${m.glyph}</span>${esc(label)}</span>`;
+}
+function fileRefLineHtml(r){
+  const label = esc(r.name || r.url || 'file');
+  let nameHtml, tag = '';
+  if (r.kind === 'link'){
+    nameHtml = r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${label}</a>` : label;
+  } else if (r.kind === 'data' && r.dataUrl){
+    // inline base64 file (demo mode) — downloadable straight from the page
+    nameHtml = `<a href="${esc(r.dataUrl)}" download="${esc(r.name || 'file')}">${label}</a>`;
+    tag = ` <span class="lnote">(file)</span>`;
+  } else if (r.kind === 'attachment'){
+    nameHtml = label;
+    tag = ` <span class="lnote">(attachment)</span>`;
+  } else {
+    nameHtml = label;
+  }
+  const noteHtml = r.note ? ` <span class="lnote">— ${esc(r.note)}</span>` : '';
+  return `<li><span class="lx lfile">📎</span><span class="ln">${nameHtml}${tag}${noteHtml}</span></li>`;
+}
+function fmtDate(d){
+  if (!d) return '';
+  const parts = d.split('-');
+  if (parts.length !== 3) return d;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(parts[1],10)-1]} ${parseInt(parts[2],10)}`;
+}
+/* Full date-group label for the Shift Log, e.g. "Mon · Sep 30, 2025". */
+function fmtDateFull(d){
+  if (!d) return '';
+  const p = d.split('-');
+  if (p.length !== 3) return d;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const y = parseInt(p[0],10), mo = parseInt(p[1],10), da = parseInt(p[2],10);
+  const wd = days[new Date(y, mo-1, da).getDay()];
+  return `${wd} · ${months[mo-1]} ${da}, ${y}`;
+}
+
+function recompute(){ state.derived = deriveAxos(state.endorsements); }
+
+/* ---------- Toasts ---------- */
+function toast(msg, kind){
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.innerHTML = `<span>${esc(msg)}</span>`;
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 320); }, 4200);
+}
+
+/* ---------- Connection pill ---------- */
+function renderConn(){
+  const pill = $('#connPill'), txt = $('#connText');
+  pill.classList.remove('ok','demo');
+  if (store.mode === 'sharepoint'){
+    pill.classList.add('ok');
+    txt.textContent = 'Connected — SharePoint';
+    $('#demoBanner').hidden = true;
+  } else {
+    pill.classList.add('demo');
+    txt.textContent = 'Demo (local)';
+    if (!bannerDismissed) $('#demoBanner').hidden = false;
+  }
+}
+let bannerDismissed = false;
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+
+/* Dashboard tiles/buckets. Each bucket matches one or more CURRENT statuses
+   (derived from the latest endorsement), so an AXO moves between buckets
+   automatically as its status updates — no extra state machine. The split of
+   Passed into a deploy-readiness stage and a final stage falls straight out of
+   deriveAxos:
+     • "For possible deployment to develop" = current `Passed - Initial`
+     • "Passed"  = current `Passed - Develop/Deployment` (+ legacy `Passed`)
+     • "Failed"  = current `Failed - Initial` | `Failed - Develop/Deployment` (+ legacy `Failed`)
+   `match` lists every current status that falls in the bucket. `token` is the
+   bucket's color; `ready` flags the positive/ready (non-alarm) deploy bucket. */
+const DASH_BUCKETS = [
+  { key:'Not Tested',       label:'Not Tested',                         token:'--st-nottested',      match:['Not Tested'] },
+  { key:'In Progress',      label:'In Progress',                        token:'--st-inprogress',     match:['In Progress'] },
+  { key:'deploy',           label:'For possible deployment to develop', token:'--st-passed-initial', match:['Passed - Initial'], ready:true },
+  { key:'Passed',           label:'Passed',                             token:'--st-passed',         match:['Passed - Develop/Deployment','Passed'] },
+  { key:'Failed',           label:'Failed',                             token:'--st-failed',         match:['Failed - Initial','Failed - Develop/Deployment','Failed'] },
+  { key:'Needs Monitoring', label:'Needs Monitoring',                   token:'--st-monitoring',     match:['Needs Monitoring'] },
+  { key:'Urgent/High Prio', label:'Urgent/High Prio',                   token:'--st-urgent',         match:['Urgent/High Prio'] },
+  { key:'Blocked',          label:'Blocked',                            token:'--st-blocked',        match:['Blocked'] }
+];
+/* The set of current statuses treated as "failed" (new stage variants + legacy). */
+const FAILED_STATUSES = ['Failed - Initial','Failed - Develop/Deployment','Failed'];
+function isFailedStatus(s){ return FAILED_STATUSES.indexOf(s) !== -1; }
+/* The dashboard-bucket key a current status belongs to (falls back to the status
+   itself so an exact-status filter still works). */
+function bucketKeyOf(status){
+  const b = DASH_BUCKETS.find(x => x.match.indexOf(status) !== -1);
+  return b ? b.key : status;
+}
+
+/* ---- Dashboard right-rail: Snapshot quick-stats + Latest handover ----
+   Every figure is derived live from the already-loaded endorsements and the
+   same current-status set the dashboard buckets use — nothing new is stored. */
+
+/* Today as a canonical Asia/Manila YYYY-MM-DD, so "Shifts today" counts the
+   shift dates that fall on the Manila calendar day, not the viewer's zone. */
+function manilaToday(){
+  try { return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Manila' }).format(new Date()); }
+  catch (e){ const d = new Date(); return isoDay_(d.getFullYear(), d.getMonth() + 1, d.getDate()); }
+}
+
+/* "As of Mon, Oct 8 · 2:34 PM" in Asia/Manila. Empty string until the first load. */
+function fmtAsOf(d){
+  if (!(d instanceof Date) || isNaN(d.getTime())) return '';
+  try {
+    const day  = new Intl.DateTimeFormat('en-US', { timeZone:'Asia/Manila', weekday:'short', month:'short', day:'numeric' }).format(d);
+    const time = new Intl.DateTimeFormat('en-US', { timeZone:'Asia/Manila', hour:'numeric', minute:'2-digit' }).format(d);
+    return 'As of ' + day + ' · ' + time;
+  } catch (e){ return 'As of ' + d.toLocaleString(); }
+}
+
+/* The four Snapshot quick-stats, none of them a status tile: total endorsements,
+   endorsements whose shift date is today (Manila), the distinct QA Resource
+   names, and the "open items" roll-up — AXOs whose CURRENT status needs
+   attention (Blocked, Urgent/High Prio, Needs Monitoring or Not Tested). */
+const SNAP_OPEN_STATUSES = ['Blocked', 'Urgent/High Prio', 'Needs Monitoring', 'Not Tested'];
+function snapshotStats(endorsements, derived){
+  const today = manilaToday();
+  const qas = new Set();
+  let shiftsToday = 0;
+  endorsements.forEach(e => {
+    const qa = (e.qaResource || '').trim();
+    if (qa) qas.add(qa);
+    if (normDate(e.shiftDate) === today) shiftsToday++;
+  });
+  const openItems = derived.filter(a => SNAP_OPEN_STATUSES.indexOf(a.current) !== -1).length;
+  return { endorsements: endorsements.length, shiftsToday, activeQAs: qas.size, openItems };
+}
+
+function renderDashboard(){
+  const d = state.derived;
+  const total = d.length;
+  const sampleNote = store.mode === 'demo'
+    ? `<span class="sample-note">◐ Sample data — not your team's real figures</span>` : '';
+
+  const bucketCount = b => d.filter(a => b.match.indexOf(a.current) !== -1).length;
+  const tiles = [`
+      <button class="tile" style="--tc:var(--brand-2)" data-filter="all" title="View in AXO Tracker">
+        <span class="t-val">${total}</span>
+        <span class="t-lab">Total AXOs</span>
+      </button>`]
+    .concat(DASH_BUCKETS.map(b => `
+      <button class="tile" style="--tc:var(${b.token})" data-filter="${esc(b.key)}" title="View in AXO Tracker">
+        <span class="t-val">${bucketCount(b)}</span>
+        <span class="t-lab"><span class="sdot"></span>${esc(b.label)}</span>
+      </button>`)).join('');
+
+  /* Attention panels. Each panel lists AXOs by CURRENT status. The Needs
+     Monitoring panel is the UNION of current Needs Monitoring and every failed
+     variant, with each row's real status pill shown (the Needs Monitoring TILE
+     above still counts only the Needs Monitoring status). The deploy panel is a
+     positive/ready panel (teal), not an alarm. */
+  const panels = [
+    { label:'Blockers',            token:'--st-blocked',        match:a => a.current === 'Blocked' },
+    { label:'Urgent / High Prio',  token:'--st-urgent',         match:a => a.current === 'Urgent/High Prio' },
+    { label:'Needs Monitoring',    token:'--st-monitoring',     match:a => a.current === 'Needs Monitoring' || isFailedStatus(a.current), note:'includes failed', pills:true },
+    { label:'Not Tested',          token:'--st-nottested',      match:a => a.current === 'Not Tested' },
+    { label:'For possible deployment to develop', token:'--st-passed-initial', match:a => a.current === 'Passed - Initial', ready:true }
+  ];
+  const attn = panels.map(col => {
+    const items = d.filter(col.match);
+    const body = items.length
+      ? `<ul>${items.map(a => {
+          const last = a.history[a.history.length - 1] || {};
+          const note = last.note ? esc(last.note) : '—';
+          // Context line: last QA · shift · date (middot separators are decorative).
+          const meta = [a.lastQA || '—', a.lastShift || '—', fmtDate(a.lastDate) || '—']
+            .map(esc).join('<span class="sep">·</span>');
+          return `
+          <li><button data-goto="${esc(a.axo)}">
+            <span class="axo-top"><span class="axo-no">AXO ${esc(a.axo)}</span>${statusPill(a.current)}</span>
+            <span class="nt">${note}</span>
+            <span class="axo-meta">${meta}</span>
+          </button></li>`;
+        }).join('')}</ul>`
+      : `<div class="empty"><span class="ok-ic">✓</span>${col.ready ? 'Nothing ready yet' : 'Nothing here — all clear'}</div>`;
+    return `<div class="attn${col.ready ? ' ready' : ''}" style="--ac:var(${col.token})">
+        <h3><span class="sdot"></span>${esc(col.label)}<span class="cnt">${items.length}</span></h3>
+        ${col.note ? `<p class="attn-note">${esc(col.note)}</p>` : ''}
+        ${body}
+      </div>`;
+  }).join('');
+
+  // Snapshot card: as-of line (from the last load) + four non-redundant quick stats.
+  const asOf = fmtAsOf(state.loadedAt);
+  const snap = snapshotStats(state.endorsements, d);
+
+  // Latest handover card: the single most-recent endorsement, by the SAME latest-
+  // entry ordering used everywhere else (date → shift Day<Mid<Night → creation).
+  const latest = sortedEndorsements()[0];
+  const handoverHtml = latest
+    ? `<div class="handover">
+        <button type="button" class="ho-btn" data-goto-log aria-label="Open the latest handover in the Shift Log">
+          <span class="ho-when">
+            <span class="ho-date">${esc(fmtDate(normDate(latest.shiftDate)))}</span>
+            <span class="ho-sep">·</span><span class="ho-shift">${esc(latest.shift)}</span>
+            <span class="ho-sep">·</span><span class="ho-qa">${esc(latest.qaResource) || '—'}</span>
+          </span>
+          <span class="ho-chips">${endoChipsHtml(latest)}</span>
+        </button>
+      </div>`
+    : `<div class="ho-empty"><span class="ok-ic">✓</span>No handovers logged yet.</div>`;
+
+  const workload = computeWorkload(state.endorsements);
+  const maxW = Math.max(1, ...workload.map(w => w.count));
+  const ticks = maxW <= 4 ? maxW : (maxW <= 8 ? Math.ceil(maxW/2)*2 : maxW);
+  const wlRows = workload.map((w, i) => {
+    const cat = '--cat-' + ((i % 8) + 1);
+    return `<div class="wl-row">
+        <span class="wl-name" title="${esc(w.qa)}">${esc(w.qa)}</span>
+        <div class="wl-track"><div class="wl-fill" style="width:${(w.count/ticks*100).toFixed(1)}%;--wc:var(${cat})"></div></div>
+        <span class="wl-val">${w.count}</span>
+      </div>`;
+  }).join('');
+
+  $('#view-dashboard').innerHTML = `
+    <div class="section-head">
+      <h2>Dashboard</h2>
+      <span class="hint">Current status of every AXO across all shift handovers.</span>
+      ${sampleNote}
+    </div>
+    <div class="tiles">${tiles}</div>
+    <div class="dash-grid">
+      <div class="card card-pad">
+        <div class="section-head" style="margin:0 0 12px"><h2 style="font-size:14px">Needs attention now</h2></div>
+        <div class="attn-cols">${attn}</div>
+      </div>
+      <div class="dash-rail">
+        <div class="card card-pad">
+          <div class="section-head" style="margin:0 0 12px;flex-direction:column;align-items:flex-start;gap:2px">
+            <h2 style="font-size:14px">Snapshot</h2>
+            <span class="snap-asof">${esc(asOf)}</span>
+          </div>
+          <div class="snap-grid">
+            <div class="snap-stat"><span class="s-val">${snap.endorsements}</span><span class="s-lab">Endorsements</span></div>
+            <div class="snap-stat"><span class="s-val">${snap.shiftsToday}</span><span class="s-lab">Shifts today</span></div>
+            <div class="snap-stat"><span class="s-val">${snap.activeQAs}</span><span class="s-lab">Active QAs</span></div>
+            <div class="snap-stat attn-stat" style="--sc:var(--st-urgent)"><span class="s-val">${snap.openItems}</span><span class="s-lab"><span class="sdot"></span>Open items</span></div>
+          </div>
+        </div>
+        <div class="card card-pad">
+          <div class="section-head" style="margin:0 0 12px"><h2 style="font-size:14px">Latest handover</h2></div>
+          ${handoverHtml}
+        </div>
+        <div class="card card-pad">
+          <div class="section-head" style="margin:0 0 14px">
+            <h2 style="font-size:14px">NPD QA workload</h2>
+            <span class="hint">Distinct AXOs each QA worked on</span>
+          </div>
+          <div class="wl">${wlRows || '<div class="sec-empty">No data yet.</div>'}</div>
+          ${workload.length ? `<div class="wl-axis"><span>0</span><span>${ticks}</span></div>` : ''}
+        </div>
+      </div>
+    </div>`;
+
+  $$('#view-dashboard .tile').forEach(b => b.addEventListener('click', () => {
+    state.statusFilter = b.dataset.filter;
+    switchTab('tracker');
+  }));
+  $$('#view-dashboard [data-goto]').forEach(b => b.addEventListener('click', () => gotoAxo(b.dataset.goto)));
+  const hb = $('#view-dashboard [data-goto-log]');
+  if (hb) hb.addEventListener('click', () => switchTab('log'));
+}
+
+function gotoAxo(axo){
+  state.search = axo;
+  state.statusFilter = 'all';
+  state.expanded = new Set([axo]);
+  switchTab('tracker');
+  setTimeout(() => {
+    const row = $(`#view-tracker tr.axo-row[data-axo="${CSS.escape(axo)}"]`);
+    if (row) row.scrollIntoView({ behavior:'smooth', block:'center' });
+  }, 60);
+}
+
+/* ============================================================
+   AXO TRACKER
+   ============================================================ */
+function renderTracker(){
+  /* Filter by dashboard bucket so the tiles and this dropdown agree (Passed =
+     final + legacy, Failed = both variants + legacy, "deploy" = Passed - Initial). */
+  const statusOptions = [{ key:'all', label:'All statuses' }]
+    .concat(DASH_BUCKETS.map(b => ({ key:b.key, label:b.label })))
+    .map(o => `<option value="${esc(o.key)}"${state.statusFilter===o.key?' selected':''}>${esc(o.label)}</option>`).join('');
+
+  let rows = state.derived.slice();
+  const q = state.search.trim().toLowerCase();
+  if (q) rows = rows.filter(a => a.axo.toLowerCase().includes(q)
+      || a.lastQA.toLowerCase().includes(q)
+      || a.history.some(h => (h.note||'').toLowerCase().includes(q)));
+  if (state.statusFilter !== 'all') rows = rows.filter(a => bucketKeyOf(a.current) === state.statusFilter);
+
+  const dir = state.sortDir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    let r = 0;
+    if (state.sortKey === 'axo') r = (parseInt(a.axo,10)||0) - (parseInt(b.axo,10)||0);
+    else if (state.sortKey === 'current') r = a.current.localeCompare(b.current);
+    else if (state.sortKey === 'lastQA') r = a.lastQA.localeCompare(b.lastQA);
+    else if (state.sortKey === 'touches') r = a.touches - b.touches;
+    else { // lastDate
+      const ka = a.lastDate + '|' + shiftRank(a.lastShift);
+      const kb = b.lastDate + '|' + shiftRank(b.lastShift);
+      r = ka < kb ? -1 : ka > kb ? 1 : 0;
+    }
+    return r * dir;
+  });
+
+  const arrow = key => state.sortKey === key ? `<span class="arr">${state.sortDir==='asc'?'▲':'▼'}</span>` : '';
+  const head = `<thead><tr>
+      <th class="sortable" data-sort="axo">AXO ${arrow('axo')}</th>
+      <th class="sortable" data-sort="current">Current status ${arrow('current')}</th>
+      <th class="sortable" data-sort="lastDate">Last touched ${arrow('lastDate')}</th>
+      <th class="sortable" data-sort="lastQA">Last QA ${arrow('lastQA')}</th>
+      <th class="sortable" data-sort="touches">Entries ${arrow('touches')}</th>
+    </tr></thead>`;
+
+  const body = rows.map(a => {
+    const open = state.expanded.has(a.axo);
+    const main = `<tr class="axo-row${open?' open':''}" data-axo="${esc(a.axo)}">
+        <td><span class="axo-no"><span class="chev">›</span> ${esc(a.axo)}</span></td>
+        <td>${statusPill(a.current)}</td>
+        <td>${esc(fmtDate(a.lastDate))} <span class="cell-sub">· ${esc(a.lastShift)}</span></td>
+        <td>${esc(a.lastQA)||'—'}</td>
+        <td class="touches">${a.touches}</td>
+      </tr>`;
+    if (!open) return main;
+    const tl = a.history.slice().reverse().map((h, i) => {
+      const isCur = i === 0; // newest entry on top, carries the CURRENT marker
+      const m = statusMeta(h.status);
+      return `<li class="tl-item${isCur?' cur':''}" style="--sc:var(${m.token})">
+          <span class="tl-dot"></span>
+          <div class="tl-meta">
+            <span class="dt">${esc(fmtDate(h.date))} · ${esc(h.shift)}</span>
+            <span>·</span><span>${esc(h.qaResource)||'—'}</span>
+            <span>·</span><span class="sec">${esc(h.section)}</span>
+            ${statusPill(h.status)}
+            ${isCur?'<span class="tl-cur-tag">current</span>':''}
+          </div>
+          <div class="tl-note">${esc(h.note)||'<span style="color:var(--muted)">No note</span>'}</div>
+        </li>`;
+    }).join('');
+    return main + `<tr class="hist-row"><td colspan="5"><div class="hist-inner">
+        <ul class="timeline">${tl}</ul></div></td></tr>`;
+  }).join('');
+
+  const table = rows.length
+    ? `<div class="tbl-wrap"><table class="axo">${head}<tbody>${body}</tbody></table></div>`
+    : emptyState('No AXOs match', 'Try clearing the search or status filter.', '🔍');
+
+  $('#view-tracker').innerHTML = `
+    <div class="section-head"><h2>AXO Tracker</h2><span class="hint">One row per AXO — click to see its full cross-shift history.</span></div>
+    <div class="toolbar">
+      <div class="search-wrap"><span class="si">⌕</span>
+        <input id="trackSearch" type="search" placeholder="Search AXO #, QA, or note…" value="${esc(state.search)}" aria-label="Search AXOs">
+      </div>
+      <select id="trackStatus" style="flex:0 0 190px" aria-label="Filter by status">${statusOptions}</select>
+      <span class="hint" style="margin-left:auto">${rows.length} of ${state.derived.length} AXOs</span>
+    </div>
+    ${table}`;
+
+  const si = $('#trackSearch');
+  si.addEventListener('input', () => { state.search = si.value; const pos = si.selectionStart; renderTracker(); const n = $('#trackSearch'); n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} });
+  $('#trackStatus').addEventListener('change', e => { state.statusFilter = e.target.value; renderTracker(); });
+  $$('#view-tracker th.sortable').forEach(th => th.addEventListener('click', () => {
+    const k = th.dataset.sort;
+    if (state.sortKey === k) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+    else { state.sortKey = k; state.sortDir = (k === 'axo' || k === 'lastQA') ? 'asc' : 'desc'; }
+    renderTracker();
+  }));
+  $$('#view-tracker tr.axo-row').forEach(tr => tr.addEventListener('click', () => {
+    const axo = tr.dataset.axo;
+    if (state.expanded.has(axo)) state.expanded.delete(axo); else state.expanded.add(axo);
+    renderTracker();
+  }));
+}
+
+/* ============================================================
+   SHIFT LOG
+   ============================================================ */
+function sortedEndorsements(){
+  return state.endorsements.slice().sort((a, b) => {
+    if (a.shiftDate !== b.shiftDate) return a.shiftDate < b.shiftDate ? 1 : -1;
+    const r = shiftRank(b.shift) - shiftRank(a.shift);
+    if (r !== 0) return r;
+    return String(b.id).localeCompare(String(a.id));
+  });
+}
+
+/* Section → compact summary chip: a short label plus the status color that the
+   section files AXOs under. nonAxo carries no AXO status, so it gets the neutral
+   brand ink. The counts come straight from the stored section arrays, so the
+   data model, derivation and Slack output are untouched. */
+const LOG_CHIP_META = {
+  workedOn:        { label:'Worked On',  token:'--st-inprogress' },
+  needsMonitoring: { label:'Monitoring', token:'--st-monitoring' },
+  blocker:         { label:'Blocked',    token:'--st-blocked' },
+  urgent:          { label:'Urgent',     token:'--st-urgent' },
+  notTested:       { label:'Not Tested', token:'--st-nottested' },
+  nonAxo:          { label:'Other',      token:'--brand-2-ink' }
+};
+const LOG_PAGE = 12;
+
+/* Build the full six-section detail body for one endorsement — the exact markup
+   the Shift Log used to render inline, reused when a compact row expands. Keeps
+   the existing Edit and Delete actions. */
+function endoDetailHtml(e){
+  const secs = orderedBlocks().map(b => {
+    if (b.type === 'file'){
+      const refs = fileRefsOf(e);
+      const inner = refs.length
+        ? `<ul class="sec-lines">${refs.map(fileRefLineHtml).join('')}</ul>`
+        : `<div class="sec-empty">— none —</div>`;
+      return `<div class="sec-block">
+          <div class="sec-title"><span class="n">${b.field.num}.</span>${esc(b.field.title)}</div>${inner}</div>`;
+    }
+    const s = b.section;
+    const rows = (e.sections && e.sections[s.key]) || [];
+    let inner;
+    if (!rows.length){
+      inner = `<div class="sec-empty">— none —</div>`;
+    } else if (s.axo){
+      inner = `<ul class="sec-lines">${rows.map(r => `
+          <li><span class="lx">•</span><span class="la">${esc(r.axo)}</span>
+            <span class="ln">${esc(r.note)||'—'}</span>
+            <span class="lst">${statusPill(r.status||defaultStatusFor(s.key))}</span></li>`).join('')}</ul>`;
+    } else {
+      inner = `<ul class="sec-lines">${rows.map(r => `
+          <li><span class="lx">•</span><span class="ln">${esc(r.note)||'—'}</span></li>`).join('')}</ul>`;
+    }
+    return `<div class="sec-block">
+        <div class="sec-title"><span class="n">${s.num}.</span>${esc(s.title)}</div>${inner}</div>`;
+  }).join('');
+  return `<div class="endo-body">${secs}</div>
+      <div class="endo-detail-actions">
+        <button class="iconbtn" data-edit="${esc(e.id)}">Edit</button>
+        <button class="iconbtn danger" data-del="${esc(e.id)}">Delete</button>
+      </div>`;
+}
+
+/* Compact summary chips for one endorsement: one chip per non-empty section
+   (count + label, colored by the section's status), plus a file count. */
+function endoChipsHtml(e){
+  const chips = SECTIONS.map(s => {
+    const rows = (e.sections && e.sections[s.key]) || [];
+    if (!rows.length) return '';
+    const m = LOG_CHIP_META[s.key] || { label: s.key, token: '--muted' };
+    return `<span class="cchip" style="--sc:var(${m.token})"><b>${rows.length}</b> ${esc(m.label)}</span>`;
+  }).filter(Boolean);
+  const refs = fileRefsOf(e);
+  const fileChip = refs.length
+    ? `<span class="cchip file" title="${refs.length} file${refs.length>1?'s':''} attached"><span aria-hidden="true">📎</span> ${refs.length}<span class="sr-only"> file${refs.length>1?'s':''} attached</span></span>`
+    : '';
+  const none = (!chips.length && !fileChip) ? `<span class="cchip muted">No items</span>` : '';
+  return chips.join('') + fileChip + none;
+}
+
+/* Does an endorsement match the active light filter? Text matches AXO numbers
+   and note text across every section (plus the QA name); shift and QA are exact. */
+function endoMatchesFilter(e, f){
+  if (f.shift && f.shift !== 'All' && e.shift !== f.shift) return false;
+  if (f.qa && f.qa !== 'All' && (e.qaResource || '') !== f.qa) return false;
+  const q = (f.text || '').trim().toLowerCase();
+  if (!q) return true;
+  const hay = [];
+  SECTIONS.forEach(s => ((e.sections && e.sections[s.key]) || []).forEach(r => {
+    if (r.axo) hay.push(String(r.axo));
+    if (r.note) hay.push(r.note);
+  }));
+  if (e.qaResource) hay.push(e.qaResource);
+  return hay.join(' \n ').toLowerCase().includes(q);
+}
+
+/* The currently-loaded, filtered window of endorsements, in sorted order. */
+function logVisibleList(){
+  const f = state.log;
+  const filtered = sortedEndorsements().filter(e => endoMatchesFilter(e, f));
+  return { filtered, visible: filtered.slice(0, f.window) };
+}
+
+function logSetAllExpanded(on){
+  const { visible } = logVisibleList();
+  if (on) visible.forEach(e => state.log.expanded.add(String(e.id)));
+  else state.log.expanded.clear();
+  renderLogList();
+}
+
+function renderLog(){
+  const all = sortedEndorsements();
+  if (!all.length){
+    $('#view-log').innerHTML = `<div class="section-head"><h2>Shift Log</h2></div>` +
+      emptyState('No endorsements yet', 'Log the first shift handover to start building AXO history.', '📋',
+        '<button class="iconbtn primary" id="logNew">+ New Endorsement</button>');
+    const b = $('#logNew'); if (b) b.addEventListener('click', () => switchTab('new'));
+    return;
+  }
+
+  // Fresh entry to the tab resets the window + filter; rows start collapsed.
+  state.log = { window: LOG_PAGE, text: '', shift: 'All', qa: 'All', expanded: new Set() };
+
+  const knownQA = Array.from(new Set(all.map(e => e.qaResource).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b));
+  const qaOpts = ['All', ...knownQA].map(n =>
+    `<option value="${esc(n)}">${n === 'All' ? 'All QA Resources' : esc(n)}</option>`).join('');
+  const shiftOpts = ['All','Day','Mid','Night'].map(s =>
+    `<option value="${esc(s)}">${s === 'All' ? 'All shifts' : esc(s) + ' shift'}</option>`).join('');
+
+  $('#view-log').innerHTML = `
+    <div class="section-head"><h2>Shift Log</h2><span class="hint">Shift handovers grouped by date, newest first. Open a row for the full endorsement.</span></div>
+    <div class="log-toolbar">
+      <div class="log-filters">
+        <input type="search" id="logSearch" class="log-search" placeholder="Filter by AXO # or note…" aria-label="Filter by AXO number or note text">
+        <select id="logShift" class="log-select" aria-label="Filter by shift">${shiftOpts}</select>
+        <select id="logQA" class="log-select" aria-label="Filter by QA Resource">${qaOpts}</select>
+      </div>
+      <div class="log-expand-controls">
+        <button type="button" class="iconbtn" id="logExpandAll">Expand all</button>
+        <button type="button" class="iconbtn" id="logCollapseAll">Collapse all</button>
+      </div>
+    </div>
+    <div id="logListHost"></div>`;
+
+  const search = $('#logSearch'), shiftSel = $('#logShift'), qaSel = $('#logQA');
+  search.addEventListener('input', () => { state.log.text = search.value; state.log.window = LOG_PAGE; renderLogList(); });
+  shiftSel.addEventListener('change', () => { state.log.shift = shiftSel.value; state.log.window = LOG_PAGE; renderLogList(); });
+  qaSel.addEventListener('change', () => { state.log.qa = qaSel.value; state.log.window = LOG_PAGE; renderLogList(); });
+  $('#logExpandAll').addEventListener('click', () => logSetAllExpanded(true));
+  $('#logCollapseAll').addEventListener('click', () => logSetAllExpanded(false));
+
+  // Delegated Edit/Delete on the list host (a fresh element each full render, so
+  // listeners never accumulate) — works for detail built lazily on expand.
+  $('#logListHost').addEventListener('click', ev => {
+    const ed = ev.target.closest('[data-edit]'); if (ed){ openForm(ed.dataset.edit); return; }
+    const dl = ev.target.closest('[data-del]'); if (dl){ doDelete(dl.dataset.del); return; }
+  });
+
+  renderLogList();
+}
+
+function renderLogList(){
+  const host = $('#logListHost');
+  if (!host) return;
+  const { filtered, visible } = logVisibleList();
+
+  if (!filtered.length){
+    host.innerHTML = emptyState('No matching shifts',
+      'No endorsements match the current filter. Clear the search or pick a different shift or QA Resource.', '🔍', '');
+    return;
+  }
+
+  // Group the visible window by date (list is already date-descending).
+  const groups = [];
+  visible.forEach(e => {
+    const last = groups[groups.length - 1];
+    if (last && last.date === e.shiftDate) last.items.push(e);
+    else groups.push({ date: e.shiftDate, items: [e] });
+  });
+
+  const groupsHtml = groups.map(g => {
+    const rows = g.items.map(e => {
+      const id = String(e.id);
+      const open = state.log.expanded.has(id);
+      return `<div class="endo-row${open ? ' open' : ''}" data-id="${esc(id)}">
+          <button type="button" class="er-summary" aria-expanded="${open}" aria-controls="det-${esc(id)}">
+            <span class="er-caret" aria-hidden="true">▸</span>
+            <span class="er-badge shift-${esc(e.shift)}">${esc(e.shift)}</span>
+            <span class="er-name">${esc(e.qaResource) || '—'}</span>
+            <span class="er-chips">${endoChipsHtml(e)}</span>
+          </button>
+          <div class="endo-detail" id="det-${esc(id)}"${open ? '' : ' hidden'}>${open ? endoDetailHtml(e) : ''}</div>
+        </div>`;
+    }).join('');
+    return `<section class="log-group">
+        <div class="log-group-head"><span class="lg-date">${esc(fmtDateFull(g.date))}</span><span class="lg-count">${g.items.length} shift${g.items.length>1?'s':''}</span></div>
+        <div class="log-rows">${rows}</div>
+      </section>`;
+  }).join('');
+
+  const more = filtered.length > visible.length
+    ? `<div class="log-loadmore"><button type="button" class="iconbtn" id="logLoadOlder">Load older (${filtered.length - visible.length} more)</button></div>`
+    : '';
+
+  host.innerHTML = groupsHtml + more;
+
+  // Row expand/collapse — build the detail DOM lazily on first open.
+  $$('#logListHost .er-summary').forEach(btn => btn.addEventListener('click', () => {
+    const row = btn.closest('.endo-row');
+    const id = row.dataset.id;
+    const det = row.querySelector('.endo-detail');
+    const willOpen = !state.log.expanded.has(id);
+    if (willOpen){
+      state.log.expanded.add(id);
+      if (!det.firstChild){
+        const e = state.endorsements.find(x => String(x.id) === id);
+        if (e) det.innerHTML = endoDetailHtml(e);
+      }
+      det.hidden = false; row.classList.add('open');
+    } else {
+      state.log.expanded.delete(id);
+      det.hidden = true; row.classList.remove('open');
+    }
+    btn.setAttribute('aria-expanded', String(willOpen));
+  }));
+
+  const older = $('#logLoadOlder');
+  if (older) older.addEventListener('click', () => { state.log.window += LOG_PAGE; renderLogList(); });
+}
+
+async function doDelete(id){
+  const e = state.endorsements.find(x => String(x.id) === String(id));
+  const label = e ? `${e.shiftDate} ${e.shift} — ${e.qaResource}` : 'this endorsement';
+  if (!confirm(`Delete the endorsement "${label}"?\n\nThis removes it from the backend for the whole team.`)) return;
+  try {
+    await store.remove(id);
+    toast('Endorsement deleted.', 'ok');
+    await reload();
+  } catch (err){
+    toast('Delete failed: ' + err.message, 'err');
+  }
+}
+
+/* ============================================================
+   NEW / EDIT ENDORSEMENT FORM
+   ============================================================ */
+function openForm(id){
+  state.editingId = id || null;
+  switchTab('new');
+}
+
+/* localStorage conveniences: last-used QA Resource + Shift, so the next
+   endorsement starts pre-filled. Date always defaults to today. */
+function lsGet(key, fallback){
+  try { const v = localStorage.getItem(key); return v == null ? fallback : v; }
+  catch (e){ return fallback; }
+}
+function lsSet(key, val){ try { localStorage.setItem(key, val); } catch (e){} }
+
+function sectionByKey(key){ return SECTIONS.find(s => s.key === key) || {}; }
+
+/* Status dropdown, grouped so the routing is legible: In Progress (the live
+   default) first, then the two staged outcomes — Passed and Failed each split
+   into an Initial and a Develop/Deployment stage — then the follow-up statuses
+   that hand an AXO off to its own section. Each option's stored VALUE is the full
+   canonical status (e.g. "Passed - Initial") so a row's dropdown and its pill
+   never diverge; under the Passed/Failed optgroups the visible text is just the
+   stage ("Initial" / "Develop/Deployment") since the group heading says Passed or
+   Failed. The flat legacy "Passed"/"Failed" are NOT offered here (see below). */
+const STATUS_GROUPS = [
+  { label:'Worked on this shift', options:[ { value:'In Progress' } ] },
+  { label:'Passed', options:[
+      { value:'Passed - Initial',            text:'Initial' },
+      { value:'Passed - Develop/Deployment', text:'Develop/Deployment' }
+  ] },
+  { label:'Failed', options:[
+      { value:'Failed - Initial',            text:'Initial' },
+      { value:'Failed - Develop/Deployment', text:'Develop/Deployment' }
+  ] },
+  { label:'Needs follow-up', options:[
+      { value:'Needs Monitoring' }, { value:'Not Tested' },
+      { value:'Urgent/High Prio' }, { value:'Blocked' }
+  ] }
+];
+function statusOptionsHtml(selected){
+  const groups = STATUS_GROUPS.map(g =>
+    `<optgroup label="${esc(g.label)}">` +
+    g.options.map(o => `<option value="${esc(o.value)}"${o.value===selected?' selected':''}>${esc(o.text || o.value)}</option>`).join('') +
+    `</optgroup>`
+  );
+  /* Backward compatibility: a legacy "Passed"/"Failed" (or any other unknown
+     stored value) on an edited row is kept selectable so editing never silently
+     loses it — shown in its own group, but never offered for new rows. */
+  const known = STATUS_GROUPS.some(g => g.options.some(o => o.value === selected));
+  const legacy = (selected && !known)
+    ? `<optgroup label="Current (legacy)"><option value="${esc(selected)}" selected>${esc(selected)}</option></optgroup>`
+    : '';
+  return legacy + groups.join('');
+}
+
+function readHeader(){
+  const d = $('#fDate'), s = $('#fShift'), q = $('#fQA');
+  return {
+    shiftDate: d ? d.value : '',
+    shift: s ? s.value : 'Day',
+    qaResource: q ? q.value : ''
+  };
+}
+
+function renderForm(){
+  const editing = state.editingId ? state.endorsements.find(e => String(e.id) === String(state.editingId)) : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const model = editing || {
+    shiftDate: today,
+    shift: lsGet('qaLastShift', 'Day'),
+    qaResource: lsGet('qaLastResource', ''),
+    sections: {},
+    fileRefs: []
+  };
+  state.draft = draftFromModel(model);
+
+  const knownQA = Array.from(new Set(state.endorsements.map(e => e.qaResource).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b));
+  const qaDatalist = knownQA.map(n => `<option value="${esc(n)}"></option>`).join('');
+
+  $('#view-new').innerHTML = `
+    <div class="section-head">
+      <h2>${editing ? 'Edit Endorsement' : 'New Endorsement'}</h2>
+      <span class="hint">${editing
+        ? 'Update this shift handover for the whole team.'
+        : 'Add one AXO at a time — its status files it into the right Slack section automatically.'}</span>
+    </div>
+    <form id="endoForm" autocomplete="off">
+      <div class="builder-main">
+        <div class="form-head">
+          <label class="fld">Date
+            <input type="date" id="fDate" value="${esc(model.shiftDate)}" required></label>
+          <label class="fld">QA Resource
+            <input type="text" id="fQA" list="qaResourceList" value="${esc(model.qaResource)}" placeholder="Select or type a QA" required>
+            <datalist id="qaResourceList">${qaDatalist}</datalist></label>
+          <label class="fld">Shift
+            <select id="fShift">${['Day','Mid','Night'].map(s => `<option${s===model.shift?' selected':''}>${s}</option>`).join('')}</select></label>
+        </div>
+
+        <div class="qa-add card">
+          <div class="qa-add-row">
+            <input type="text" inputmode="numeric" id="qAxo" class="qa-axo" placeholder="AXO #" aria-label="AXO number">
+            <select id="qStatus" class="qa-status" aria-label="Status">${statusOptionsHtml('In Progress')}</select>
+            <input type="text" id="qNote" class="qa-note" placeholder="Note (optional)" aria-label="Note">
+            <button type="button" class="iconbtn primary" id="qAdd">+ Add</button>
+          </div>
+          <p class="qa-add-hint">Pick a status — it files the AXO under the right section automatically. Press <kbd>Enter</kbd> in the AXO or note field to add and keep going.</p>
+        </div>
+
+        <div id="builderRows"></div>
+
+        <div class="extras">
+          <details class="extra" id="extraNonAxo">
+            <summary>${esc(sectionByKey('nonAxo').title)}<span class="ex-cnt" id="nonAxoCnt">0</span></summary>
+            <div class="extra-body">
+              <div class="lines" id="nonAxoLines"></div>
+              <button type="button" class="iconbtn add-ln" id="addNonAxo">+ Add line</button>
+            </div>
+          </details>
+          <details class="extra" id="extraFiles">
+            <summary>${esc(FILE_FIELD.title)}<span class="ex-cnt" id="filesCnt">0</span></summary>
+            <div class="extra-body">
+              <p class="fsec-hint">${esc(FILE_FIELD.hint)}</p>
+              <div class="filedrop" id="fileDrop">
+                <input type="file" id="fileInput" multiple hidden>
+                <span class="fd-main">Drag files here, or <button type="button" class="linklike" id="filePick">choose files</button></span>
+                <span class="fd-cap" id="fileCap"></span>
+              </div>
+              <div class="lines" id="fileLines"></div>
+              <button type="button" class="iconbtn add-ln" id="addFile">+ Add a link instead</button>
+            </div>
+          </details>
+        </div>
+
+        <details class="extra preview-panel" id="previewPanel">
+          <summary><span class="pdot"></span>Preview Slack post</summary>
+          <div class="extra-body preview-body">
+            <pre class="preview-pre" id="slackPreview" aria-live="polite"></pre>
+            <p class="preview-note">Exactly what the Slack "Copy" button (and any Slack post) will produce once this is saved.</p>
+          </div>
+        </details>
+      </div>
+
+      <div class="form-actions">
+        <span class="hint">Date and QA Resource are required to save; everything else is optional.</span>
+        <span class="sp"></span>
+        <button type="button" class="iconbtn" id="fCancel">Cancel</button>
+        <button type="submit" class="iconbtn primary" id="fSave">${editing ? 'Update endorsement' : 'Save endorsement'}</button>
+      </div>
+    </form>`;
+
+  // Demo-mode file cap note / connected-mode attachment note on the drop zone.
+  const cap = $('#fileCap');
+  if (cap) cap.textContent = store.mode === 'sharepoint'
+    ? 'Files upload as list-item attachments on Save.'
+    : `Demo mode: files are stored in this browser (max ${fmtSize(DEMO_FILE_CAP)} each). For larger files, add a link.`;
+
+  renderBuilderRows();
+  renderNonAxo();
+  renderFiles();
+  if (state.draft.nonAxo.length){ const el = $('#extraNonAxo'); if (el) el.open = true; }
+  if (state.draft.fileRefs.length){ const el = $('#extraFiles'); if (el) el.open = true; }
+
+  // Collapsible Slack preview — remembers open/closed per viewer; default collapsed.
+  const pp = $('#previewPanel');
+  if (pp){
+    pp.open = lsGet('qaPreviewOpen', '0') === '1';
+    pp.addEventListener('toggle', () => lsSet('qaPreviewOpen', pp.open ? '1' : '0'));
+  }
+  renderPreview();
+
+  // Delegated handlers on the freshly-built form (so they never stack across renders).
+  const form = $('#endoForm');
+  form.addEventListener('input', onBuilderInput);
+  form.addEventListener('change', onBuilderChange);
+  form.addEventListener('click', onBuilderClick);
+  form.addEventListener('submit', onSaveForm);
+  ['qAxo','qNote'].forEach(id => {
+    const el = $('#' + id);
+    if (el) el.addEventListener('keydown', ev => { if (ev.key === 'Enter'){ ev.preventDefault(); addQuickRow(); } });
+  });
+
+  // Drag-and-drop onto the file zone (file picker + remove are handled via delegation).
+  const drop = $('#fileDrop');
+  if (drop){
+    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); if (ev !== 'dragleave' || e.target === drop) drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files); });
+  }
+
+  // Connected edit: list the item's real attachments and reconcile the draft.
+  if (store.mode === 'sharepoint' && editing){
+    SP.listAttachments(editing.id).then(list => {
+      const names = list.map(a => a.name);
+      const present = new Set(names);
+      // drop payload-recorded attachments no longer on the server (and not pending)
+      state.draft.fileRefs = state.draft.fileRefs.filter(f =>
+        !(f.kind === 'attachment' && !f._file && !present.has(f.name)));
+      const have = new Set(state.draft.fileRefs.filter(f => f.kind === 'attachment').map(f => f.name));
+      names.forEach(nm => { if (!have.has(nm)) state.draft.fileRefs.push({ kind:'attachment', name:nm, note:'', dataUrl:'', _existing:true, _file:null, _size:0 }); });
+      state.draft.fileRefs.forEach(f => { if (f.kind === 'attachment' && present.has(f.name)) f._existing = true; });
+      renderFiles(); renderPreview();
+      if (state.draft.fileRefs.length){ const el = $('#extraFiles'); if (el) el.open = true; }
+    }).catch(() => { /* leave payload-recorded refs as-is on error */ });
+  }
+
+  $('#fCancel').addEventListener('click', () => { state.editingId = null; switchTab(editing ? 'log' : 'dashboard'); });
+}
+
+/* ---------- builder: added rows, grouped by derived section ---------- */
+function builderRowHtml(r, idx){
+  const tok = statusMeta(r.status).token;
+  return `<div class="brow" data-idx="${idx}" style="--sc:var(${tok})">
+      <input type="text" inputmode="numeric" class="b-axo" placeholder="AXO #" value="${esc(r.axo)}" aria-label="AXO number">
+      <select class="b-status" aria-label="Status">${statusOptionsHtml(r.status)}</select>
+      <input type="text" class="b-note" placeholder="Note (optional)" value="${esc(r.note)}" aria-label="Note">
+      <button type="button" class="rm-line b-rm" title="Remove AXO" aria-label="Remove AXO">&times;</button>
+    </div>`;
+}
+function renderBuilderRows(){
+  const container = $('#builderRows');
+  if (!container) return;
+  const rows = state.draft.rows;
+  if (!rows.length){
+    container.innerHTML = `<div class="builder-empty"><b>No AXO updates yet</b> — add your first above.</div>`;
+    return;
+  }
+  const byKey = {};
+  rows.forEach((r, idx) => { (byKey[r.section] || (byKey[r.section] = [])).push({ r, idx }); });
+  container.innerHTML = SECTIONS.filter(s => s.axo && byKey[s.key] && byKey[s.key].length).map(s => {
+    const items = byKey[s.key].map(({ r, idx }) => builderRowHtml(r, idx)).join('');
+    return `<div class="brow-group">
+        <div class="brow-group-h"><span class="n">${s.num}.</span>${esc(s.title)}<span class="brow-cnt">${byKey[s.key].length}</span></div>
+        <div class="brows">${items}</div>
+      </div>`;
+  }).join('');
+}
+
+/* ---------- builder: collapsible extras ---------- */
+function renderNonAxo(){
+  const c = $('#nonAxoLines');
+  if (!c) return;
+  const arr = state.draft.nonAxo;
+  c.innerHTML = arr.length
+    ? arr.map((n, i) => `<div class="line-row nonaxo" data-idx="${i}">
+        <input type="text" class="l-note" placeholder="Non-AXO note (regression, end-to-end, tooling, environment…)" value="${esc(n.note||'')}">
+        <button type="button" class="rm-line nonaxo-rm" title="Remove line" aria-label="Remove line">&times;</button>
+      </div>`).join('')
+    : `<div class="lines-empty">No non-AXO notes yet.</div>`;
+  const cnt = $('#nonAxoCnt'); if (cnt) cnt.textContent = arr.length;
+}
+function renderFiles(){
+  const c = $('#fileLines');
+  if (!c) return;
+  const arr = state.draft.fileRefs;
+  c.innerHTML = arr.length
+    ? arr.map((f, i) => {
+        if (f.kind === 'link'){
+          return `<div class="line-row file-row" data-idx="${i}">
+            <input type="text" class="f-name" placeholder="File name / label" value="${esc(f.name||'')}">
+            <input type="url" class="f-url" placeholder="Link — SharePoint/Drive URL" value="${esc(f.url||'')}">
+            <input type="text" class="f-note" placeholder="Note (optional)" value="${esc(f.note||'')}">
+            <button type="button" class="rm-line file-rm" title="Remove file reference" aria-label="Remove file reference">&times;</button>
+          </div>`;
+        }
+        // attachment / data → a chip showing the real file, with an optional note
+        const sizeTxt = f._size ? ` · ${fmtSize(f._size)}` : '';
+        const kindTxt = f.kind === 'attachment'
+          ? (f._existing && !f._file ? 'attachment' : 'will upload on save')
+          : 'stored in browser';
+        return `<div class="file-chip" data-idx="${i}">
+            <span class="fc-ic">📎</span>
+            <span class="fc-meta">
+              <span class="fc-name" title="${esc(f.name||'file')}">${esc(f.name||'file')}</span>
+              <span class="fc-sub">${esc(kindTxt)}${esc(sizeTxt)}</span>
+            </span>
+            <input type="text" class="f-note fc-note" placeholder="Note (optional)" value="${esc(f.note||'')}" aria-label="File note">
+            <button type="button" class="rm-line file-rm" title="Remove file" aria-label="Remove file">&times;</button>
+          </div>`;
+      }).join('')
+    : `<div class="lines-empty">No files or links yet.</div>`;
+  const cnt = $('#filesCnt'); if (cnt) cnt.textContent = arr.length;
+}
+
+/* Add real files (from the picker or drag-drop) to the draft. Connected mode →
+   pending list-item attachments; Demo mode → inline base64 data (size-capped). */
+function handleFiles(fileList){
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  const ex = $('#extraFiles'); if (ex) ex.open = true;
+  files.forEach(file => {
+    if (store.mode === 'sharepoint'){
+      state.draft.fileRefs.push({ kind:'attachment', name:file.name, note:'', dataUrl:'',
+        _existing:false, _file:file, _size:file.size });
+      renderFiles(); renderPreview();
+    } else {
+      if (file.size > DEMO_FILE_CAP){
+        toast(`"${file.name}" is ${fmtSize(file.size)} — too large for demo mode (max ${fmtSize(DEMO_FILE_CAP)}). Add it as a link instead.`, 'err');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        state.draft.fileRefs.push({ kind:'data', name:file.name, note:'', dataUrl:String(reader.result),
+          _existing:false, _file:null, _size:file.size });
+        renderFiles(); renderPreview();
+      };
+      reader.onerror = () => toast(`Could not read "${file.name}".`, 'err');
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+/* ---------- builder: live Slack preview (shares the Copy builder) ---------- */
+function renderPreview(){
+  const pre = $('#slackPreview');
+  if (!pre) return;
+  pre.textContent = buildSlackText(buildModelFromDraft(readHeader(), state.draft));
+}
+
+/* ---------- builder: quick add ---------- */
+function addQuickRow(){
+  const axoEl = $('#qAxo'), stEl = $('#qStatus'), noteEl = $('#qNote');
+  if (!axoEl || !stEl || !noteEl) return;
+  const axo = axoEl.value.trim();
+  const status = stEl.value;
+  const note = noteEl.value.trim();
+  if (!axo && !note){ axoEl.focus(); return; }
+  state.draft.rows.push({ axo, status, note, section: sectionForStatus(status) });
+  axoEl.value = ''; noteEl.value = '';
+  renderBuilderRows();
+  renderPreview();
+  axoEl.focus();
+}
+
+/* ---------- builder: delegated events ---------- */
+function onBuilderInput(e){
+  const t = e.target; if (!t.closest) return;
+  const brow = t.closest('.brow');
+  if (brow){
+    const row = state.draft.rows[+brow.dataset.idx]; if (!row) return;
+    if (t.classList.contains('b-axo')) row.axo = t.value;
+    else if (t.classList.contains('b-note')) row.note = t.value;
+    renderPreview(); return;
+  }
+  const naRow = t.closest('#nonAxoLines .line-row');
+  if (naRow){ const n = state.draft.nonAxo[+naRow.dataset.idx]; if (n) n.note = t.value; renderPreview(); return; }
+  const fRow = t.closest('#fileLines .line-row, #fileLines .file-chip');
+  if (fRow){
+    const f = state.draft.fileRefs[+fRow.dataset.idx]; if (!f) return;
+    if (t.classList.contains('f-name')) f.name = t.value;
+    else if (t.classList.contains('f-url')) f.url = t.value;
+    else if (t.classList.contains('f-note')) f.note = t.value;
+    renderPreview(); return;
+  }
+  if (t.id === 'fDate' || t.id === 'fQA') renderPreview();
+}
+function onBuilderChange(e){
+  const t = e.target; if (!t.closest) return;
+  if (t.id === 'fShift'){ renderPreview(); return; }
+  if (t.id === 'fileInput'){ handleFiles(t.files); t.value = ''; return; }
+  const brow = t.closest('.brow');
+  if (brow && t.classList.contains('b-status')){
+    const row = state.draft.rows[+brow.dataset.idx]; if (!row) return;
+    row.status = t.value;
+    row.section = sectionForStatus(t.value);
+    renderBuilderRows();
+    renderPreview();
+  }
+}
+function onBuilderClick(e){
+  const t = e.target; if (!t.closest) return;
+  if (t.id === 'qAdd'){ addQuickRow(); return; }
+  const brm = t.closest('.b-rm');
+  if (brm){ state.draft.rows.splice(+brm.closest('.brow').dataset.idx, 1); renderBuilderRows(); renderPreview(); return; }
+  if (t.id === 'addNonAxo'){ state.draft.nonAxo.push({ note:'' }); renderNonAxo(); focusLast('#nonAxoLines .l-note'); renderPreview(); return; }
+  if (t.id === 'filePick'){ const fi = $('#fileInput'); if (fi) fi.click(); return; }
+  if (t.id === 'addFile'){ state.draft.fileRefs.push({ kind:'link', name:'', url:'', note:'' }); renderFiles(); focusLast('#fileLines .f-name'); renderPreview(); return; }
+  const narm = t.closest('.nonaxo-rm');
+  if (narm){ state.draft.nonAxo.splice(+narm.closest('.line-row').dataset.idx, 1); renderNonAxo(); renderPreview(); return; }
+  const frm = t.closest('.file-rm');
+  if (frm){ const host = frm.closest('.line-row, .file-chip'); state.draft.fileRefs.splice(+host.dataset.idx, 1); renderFiles(); renderPreview(); return; }
+}
+function focusLast(sel){
+  const els = $$(sel);
+  const el = els[els.length - 1];
+  if (el) el.focus();
+}
+
+async function onSaveForm(ev){
+  ev.preventDefault();
+  const header = readHeader();
+  if (!header.shiftDate || !header.qaResource.trim()){ toast('Date and QA Resource are required.', 'err'); return; }
+
+  const editing = state.editingId ? state.endorsements.find(e => String(e.id) === String(state.editingId)) : null;
+
+  // Connected mode: settle the final (deduped) attachment names BEFORE building the
+  // payload, so the stored fileRefs match the names we actually upload.
+  if (store.mode === 'sharepoint') await assignAttachmentNames(editing, state.draft);
+
+  const model = buildModelFromDraft(header, state.draft);
+  model.id = editing ? editing.id : undefined;
+  model.title = buildTitle(model);
+
+  // Remember the QA Resource and Shift so the next endorsement starts pre-filled.
+  lsSet('qaLastResource', model.qaResource);
+  lsSet('qaLastShift', model.shift);
+
+  const saveBtn = $('#fSave'); saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+  try {
+    let saved;
+    if (editing) { saved = await store.update(model); toast('Endorsement updated.', 'ok'); }
+    else { saved = await store.add(model); toast('Endorsement saved.', 'ok'); }
+    const savedId = (saved && saved.id != null) ? saved.id : model.id;
+
+    // Connected mode: upload pending attachments and remove any that were deleted.
+    // Upload errors surface as toasts but never undo the saved item.
+    if (store.mode === 'sharepoint') await syncAttachments(savedId, state.draft);
+
+    // Connected mode: mirror the touched AXOs' current status into the helper list,
+    // so a scheduled flow can read it. Best-effort — never blocks or reverts the save.
+    if (store.mode === 'sharepoint'){
+      try { await syncAxoStatusMirror(model); } catch (e){ /* never block the save */ }
+    }
+
+    // Automatic Slack notification on a NEW endorsement (no-op if no webhook is
+    // configured). Edits do not post, to avoid noise. Non-blocking: a failed post
+    // shows a toast but never reverts the save.
+    if (!editing && slackWebhookEnabled()){
+      const posted = await postToSlackWebhook(buildSlackAlert(model));
+      if (!posted) toast('Endorsement saved — the Slack notification could not be sent.', 'err');
+    }
+
+    state.editingId = null;
+    await reload();
+    switchTab('log');
+  } catch (err){
+    toast('Save failed: ' + err.message, 'err');
+    saveBtn.disabled = false; saveBtn.textContent = editing ? 'Update endorsement' : 'Save endorsement';
+  }
+}
+
+/* Connected mode: assign final, collision-free names to pending attachment
+   uploads, deduped against the item's existing attachments and this batch. The
+   existing list is cached on the draft for syncAttachments to diff against. */
+async function assignAttachmentNames(editing, draft){
+  let existing = [];
+  if (editing){ try { existing = (await SP.listAttachments(editing.id)).map(a => a.name); } catch (e){} }
+  draft._existingAttachments = existing;
+  const kept = draft.fileRefs.filter(f => f.kind === 'attachment' && f._existing && !f._file).map(f => f.name);
+  const used = new Set([...existing, ...kept]);
+  draft.fileRefs.filter(f => f.kind === 'attachment' && f._file).forEach(f => {
+    const fn = dedupeFileName((f._file && f._file.name) || f.name || 'file', used);
+    f.name = fn; f._finalName = fn; used.add(fn);
+  });
+}
+
+/* Connected mode: upload each pending File as a list-item attachment, then delete
+   any attachment that existed before but is no longer in the draft. */
+async function syncAttachments(id, draft){
+  if (id == null) return;
+  for (const f of draft.fileRefs.filter(x => x.kind === 'attachment' && x._file)){
+    try {
+      const buf = await f._file.arrayBuffer();
+      await SP.addAttachment(id, f._finalName || f.name, buf);
+      f._file = null; f._existing = true;
+    } catch (e){ toast(`Attachment "${f.name}" failed to upload: ${e.message}`, 'err'); }
+  }
+  const kept = new Set(draft.fileRefs.filter(x => x.kind === 'attachment').map(x => x.name));
+  for (const nm of (draft._existingAttachments || [])){
+    if (!kept.has(nm)){
+      try { await SP.deleteAttachment(id, nm); } catch (e){ toast(`Could not remove attachment "${nm}": ${e.message}`, 'err'); }
+    }
+  }
+}
+
+/* Connected mode: UPSERT the current status of each AXO touched by this save into
+   the optional QAAxoStatus helper list (one row per AXO). Look each AXO up by
+   AxoNumber; MERGE if present, else create. Best-effort and NON-BLOCKING — if the
+   list is missing or any upsert fails, a single toast is shown and the main save is
+   left intact. Skipped entirely when the list name is empty (feature off); demo mode
+   never calls this. */
+async function syncAxoStatusMirror(model){
+  if (store.mode !== 'sharepoint') return;                           // demo: no server
+  if (!String(SP_CONFIG.axoStatusListName || '').trim()) return;     // feature disabled
+  const touched = touchedAxoStatuses(model);
+  if (!touched.length) return;
+  const now = new Date().toISOString();
+  let failures = 0;
+  for (const t of touched){
+    const fields = {
+      Title: t.axo,
+      AxoNumber: t.axo,
+      Status: t.status,
+      Note: t.note,
+      QAResource: model.qaResource || '',
+      ShiftDate: model.shiftDate || '',
+      Section: t.section,
+      UpdatedAt: now
+    };
+    try {
+      const existing = await SP.findAxoStatus(t.axo);
+      if (existing) await SP.updateAxoStatus(existing.Id, fields);
+      else await SP.addAxoStatus(fields);
+    } catch (e){ failures++; }
+  }
+  if (failures){
+    toast(`Status mirror: ${failures} of ${touched.length} AXO row(s) could not be updated in ${esc(SP_CONFIG.axoStatusListName)}. The endorsement was saved.`, 'err');
+  }
+}
+
+/* ============================================================
+   COPY LATEST AS SLACK
+   ============================================================ */
+function latestEndorsement(){
+  const list = sortedEndorsements();
+  return list[0] || null;
+}
+function buildSlackText(e){
+  if (!e) return '';
+  const lines = [];
+  lines.push(`*Endorsement of Tasks — ${e.shiftDate} ${e.shift} — ${e.qaResource}*`);
+  lines.push('');
+  orderedBlocks().forEach(b => {
+    if (b.type === 'file'){
+      lines.push(`*${b.field.title}*`);
+      const refs = fileRefsOf(e);
+      if (!refs.length){ lines.push('• —'); }
+      else refs.forEach(r => {
+        // attachments by name, links as name + url, data files by name
+        const parts = [r.name || r.url || 'file'];
+        if (r.kind === 'link' && r.url && r.name) parts.push(r.url);
+        if (r.kind === 'attachment') parts[0] += ' (attachment)';
+        if (r.note) parts.push(r.note);
+        lines.push('• ' + parts.join(' — '));
+      });
+      lines.push('');
+      return;
+    }
+    const s = b.section;
+    lines.push(`*${s.title}*`);
+    const rows = (e.sections && e.sections[s.key]) || [];
+    if (!rows.length){ lines.push('• —'); }
+    else if (s.axo){
+      rows.forEach(r => lines.push(`• AXO ${r.axo} — ${r.note || ''} (${r.status || s.defaultStatus})`));
+    } else {
+      rows.forEach(r => lines.push(`• ${r.note || ''}`));
+    }
+    lines.push('');
+  });
+  return lines.join('\n').trim();
+}
+async function copyLatest(){
+  const e = latestEndorsement();
+  if (!e){ toast('No endorsement to copy yet.', 'err'); return; }
+  const text = buildSlackText(e);
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Latest endorsement copied as Slack handover.', 'ok');
+  } catch (err){
+    // fallback: selectable textarea
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('Copied as Slack handover.', 'ok'); }
+    catch (e2){ toast('Could not copy automatically — select and copy manually.', 'err'); }
+    ta.remove();
+  }
+}
+
+/* ============================================================
+   OPTIONAL SLACK WEBHOOK (off by default — nothing posts unless
+   SP_CONFIG.slackWebhookUrl is set; then a NEW endorsement auto-posts)
+   ============================================================ */
+function slackWebhookEnabled(){ return !!String(SP_CONFIG.slackWebhookUrl || '').trim(); }
+
+/* Form-encoded body for a Slack Incoming Webhook sent as a CORS "simple request"
+   (no preflight): Content-Type application/x-www-form-urlencoded, body
+   "payload=" + the JSON-encoded { text }. Pure — unit-tested. */
+function slackWebhookBody(text){
+  return 'payload=' + encodeURIComponent(JSON.stringify({ text: text || '' }));
+}
+
+/* POST the Slack text to the configured webhook. Returns false without sending
+   when no webhook is set. Uses mode:'no-cors' so the response is opaque — a
+   thrown error means failure, otherwise we assume it was sent. Never throws. */
+async function postToSlackWebhook(text){
+  const url = String(SP_CONFIG.slackWebhookUrl || '').trim();
+  if (!url) return false;
+  try {
+    await fetch(url, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+      body: slackWebhookBody(text)
+    });
+    return true;
+  } catch (e){
+    return false;
+  }
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+function emptyState(title, msg, ic, actionHtml){
+  return `<div class="card"><div class="empty-state">
+      <div class="es-ic">${ic||'∅'}</div>
+      <h3>${esc(title)}</h3><p>${esc(msg)}</p>${actionHtml||''}
+    </div></div>`;
+}
+
+/* ============================================================
+   TABS + WIRING
+   ============================================================ */
+function switchTab(tab){
+  state.activeTab = tab;
+  $$('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === tab)));
+  ['dashboard','tracker','log','new'].forEach(t => { $('#view-' + t).hidden = (t !== tab); });
+  if (tab === 'dashboard') renderDashboard();
+  else if (tab === 'tracker') renderTracker();
+  else if (tab === 'log') renderLog();
+  else if (tab === 'new') renderForm();
+  try { if (location.hash.slice(1) !== tab) history.replaceState(null, '', '#' + tab); } catch (e) {}
+}
+
+function renderAll(){
+  renderConn();
+  renderDashboard();
+  if (state.activeTab !== 'dashboard') switchTab(state.activeTab);
+}
+
+async function reload(){
+  try {
+    state.endorsements = await store.list();
+  } catch (err){
+    toast('Could not load data: ' + err.message, 'err');
+    state.endorsements = [];
+  }
+  state.loadedAt = new Date();
+  recompute();
+  // A change to the endorsements list — an add, an edit, or a DELETE — re-derives
+  // the AXO set, so re-render every data-derived view, not just the active tab: the
+  // Dashboard buckets, the AXO Tracker, and the Shift Log. This is what makes a
+  // deleted shift log drop any AXO it solely sourced from the Tracker and Dashboard,
+  // while an AXO still present in other endorsements is recomputed in place. (The
+  // "new" form is edited in place and is intentionally left untouched.)
+  renderDashboard();
+  renderTracker();
+  renderLog();
+}
+
+/* theme */
+function applyTheme(t){
+  if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  else document.documentElement.removeAttribute('data-theme');
+  try { localStorage.setItem('qaTheme', t); } catch (e) {}
+}
+function initTheme(){
+  let t = 'system';
+  try { t = localStorage.getItem('qaTheme') || 'system'; } catch (e) {}
+  applyTheme(t);
+}
+function cycleTheme(){
+  let t = 'system';
+  try { t = localStorage.getItem('qaTheme') || 'system'; } catch (e) {}
+  const next = t === 'system' ? 'light' : t === 'light' ? 'dark' : 'system';
+  applyTheme(next);
+  toast('Theme: ' + next, 'ok');
+}
+
+function wire(){
+  const bs = $('#buildStamp'); if (bs) bs.textContent = 'build ' + BUILD;
+  $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+  $('#refreshBtn').addEventListener('click', async () => {
+    $('#refreshBtn').disabled = true;
+    const items = await store.detect().catch(() => null);
+    if (items) { state.endorsements = items; state.loadedAt = new Date(); recompute(); }
+    else await reload();
+    renderConn();
+    renderAll();
+    $('#refreshBtn').disabled = false;
+    toast('Refreshed from ' + (store.mode === 'sharepoint' ? 'SharePoint.' : 'local demo store.'), 'ok');
+  });
+  $('#copyBtn').addEventListener('click', copyLatest);
+  $('#themeBtn').addEventListener('click', cycleTheme);
+  $('#helpBtn').addEventListener('click', () => { $('#helpModal').hidden = false; });
+  $('#helpX').addEventListener('click', () => { $('#helpModal').hidden = true; });
+  $('#helpModal').addEventListener('click', e => { if (e.target.id === 'helpModal') $('#helpModal').hidden = true; });
+  $('#bannerX').addEventListener('click', () => { bannerDismissed = true; $('#demoBanner').hidden = true; });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#helpModal').hidden = true; });
+}
+
+async function boot(){
+  initTheme();
+  wire();
+  // initial tab from hash
+  const h = (location.hash || '').slice(1);
+  if (['dashboard','tracker','log','new'].includes(h)) state.activeTab = h;
+  state.endorsements = await store.detect();
+  state.loadedAt = new Date();
+  recompute();
+  renderConn();
+  switchTab(state.activeTab);
+}
+
+boot();
+</script>
+</body>
+</html>
